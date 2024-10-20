@@ -89,4 +89,4 @@ Contributions are welcome! Feel free to open issues or submit pull requests.
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## References
-https://medium.com/r/?url=https%3A%2F%2Fgithub.com%2Frun-llama%2Fopenai_realtime_client
+https://github.com/run-llama/openai_realtime_client
