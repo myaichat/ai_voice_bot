@@ -1,5 +1,5 @@
 
-# Voice Bot
+# AI Voice Bot
 
 This project is an AI-powered voice bot built using OpenAI's Realtime API. It allows for real-time voice interaction through a command-line interface (CLI) and can be modified to handle text output, as well as include a mocked version for cost-effective testing.
 
@@ -38,8 +38,8 @@ This project is an AI-powered voice bot built using OpenAI's Realtime API. It al
 To install this project, clone the repository and run the following commands:
 
 ```bash
-git clone https://github.com/myaichat/voice_bot.git
-cd voice_bot
+git clone https://github.com/myaichat/ai_voice_bot.git
+cd ai_voice_bot
 pip install -e .
 ```
 
@@ -87,3 +87,6 @@ Contributions are welcome! Feel free to open issues or submit pull requests.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## References
+https://medium.com/r/?url=https%3A%2F%2Fgithub.com%2Frun-llama%2Fopenai_realtime_client
