@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='voice_bot',
+    name='ai-voice_bot',
     version='1.0.0',
     packages=find_packages(),
     install_requires=[
