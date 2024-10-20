@@ -1,0 +1,54 @@
+from setuptools import setup, find_packages
+
+# Safely read the README.md file with UTF-8 encoding
+with open('README.md', 'r', encoding='utf-8') as f:
+    long_description = f.read()
+
+setup(
+    name='voice_bot',
+    version='1.0.0',
+    packages=find_packages(),
+    install_requires=[
+        'openai',
+        'websockets',
+        'pyaudio',
+        'numpy',
+        'pydub',
+        'pynput',
+
+    ],
+    entry_points={
+        'console_scripts': [
+            'vbot=voice_bot.vbot:cli_main',
+            'tbot=voice_bot.tbot:cli_main',
+            'mbot=voice_bot.mbot:main',
+        ],
+    },
+    include_package_data=True,
+    author='Alex Buzunov',
+    author_email='alex_buz@yahoo.com',
+    description='An AI-powered voice bot using OpenAI Realtime API',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    url='https://github.com/myaichat/voice_bot',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Topic :: Software Development :: Libraries',
+        'Operating System :: OS Independent',
+    ],
+    python_requires='>=3.8',
+    project_urls={
+        'Source': 'https://github.com/myaichat/voice_bot',
+        'Tracker': 'https://github.com/myaichat/voice_bot/issues',
+    },
+    changelog = """
+    Version 1.0.0:
+    - Created text and voice modes
+    """
+)
