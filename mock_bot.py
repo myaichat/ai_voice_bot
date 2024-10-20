@@ -6,8 +6,8 @@ import numpy as np
 
 from colorama import Fore, Back, Style, init
 
-from voice_bot.mock.MockAudioHandler import MockAudioHandler
-from voice_bot.client.TextRealtimeClient import RealtimeClient
+from ai_voice_bot.mock.MockAudioHandler import MockAudioHandler
+from ai_voice_bot.client.TextRealtimeClient import RealtimeClient
 # AudioHandler class
 
 init(autoreset=True)

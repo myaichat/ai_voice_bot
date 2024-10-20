@@ -11,9 +11,9 @@ from pydub import AudioSegment
 
 #from llama_index.core.tools import BaseTool, AsyncBaseTool, ToolSelection, adapt_to_async_tool, call_tool_with_selection
 
-from voice_bot.handlers.AudioHandler import AudioHandler    
-from voice_bot.handlers.InputHandler import InputHandler    
-from voice_bot.client.VoiceRealtimeClient import RealtimeClient, TurnDetectionMode
+from ai_voice_bot.handlers.AudioHandler import AudioHandler    
+from ai_voice_bot.handlers.InputHandler import InputHandler    
+from ai_voice_bot.client.VoiceRealtimeClient import RealtimeClient, TurnDetectionMode
 
 
 
@@ -85,7 +85,7 @@ async def main():
 def cli_main():
     print("Starting Realtime API CLI with Server VAD...")
     asyncio.run(main())
-    
+
 if __name__ == "__main__":
     print("Starting Realtime API CLI with Server VAD...")
     asyncio.run(main())

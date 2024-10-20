@@ -6,7 +6,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 setup(
     name='ai-voice_bot',
-    version='1.0.0',
+    version='1.0.1',
     packages=find_packages(),
     install_requires=[
         'openai',
@@ -30,7 +30,7 @@ setup(
     description='An AI-powered voice bot using OpenAI Realtime API',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/myaichat/voice_bot',
+    url='https://github.com/myaichat/ai_voice_bot',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -44,11 +44,11 @@ setup(
     ],
     python_requires='>=3.8',
     project_urls={
-        'Source': 'https://github.com/myaichat/voice_bot',
-        'Tracker': 'https://github.com/myaichat/voice_bot/issues',
+        'Source': 'https://github.com/myaichat/ai_voice_bot',
+        'Tracker': 'https://github.com/myaichat/ai_voice_bot/issues',
     },
     changelog = """
-    Version 1.0.0:
-    - Created text and voice modes
+    Version 1.0.1:
+    - Added README.md file
     """
 )
