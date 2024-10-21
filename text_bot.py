@@ -1,41 +1,12 @@
 
 import asyncio
-import websockets
-import json
-import base64
-import io
-
-from typing import Optional, Callable, List, Dict, Any
-from enum import Enum
-from pydub import AudioSegment
-
+import os,yaml
 #from llama_index.core.tools import BaseTool, AsyncBaseTool, ToolSelection, adapt_to_async_tool, call_tool_with_selection
 from ai_voice_bot.handlers.AudioHandler import AudioHandler    
 from ai_voice_bot.handlers.InputHandler import InputHandler    
 from ai_voice_bot.client.TextRealtimeClient import RealtimeClient, TurnDetectionMode
-
-import asyncio
 from pynput import keyboard
-
-
-
-import asyncio
-import pyaudio
-import wave
-import queue
-import io
-from typing import Optional
-
-from pydub import AudioSegment
-import threading
-
-
-
-
-import asyncio
-import os
-
-from pynput import keyboard
+from os.path import join
 
 #from llama_index.core.tools import FunctionTool
 
@@ -52,6 +23,18 @@ def get_phone_number(name: str) -> str:
 
 #tools = [FunctionTool.from_defaults(fn=get_phone_number)]
 
+
+# Function to read the YAML configuration file
+def load_config(file_path):
+    with open(file_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+# Example usage
+config = load_config(join('config','interview.yaml'))
+print(config)
+
+
 async def main():
     audio_handler = AudioHandler()
     input_handler = InputHandler()
@@ -59,10 +42,14 @@ async def main():
     
     client = RealtimeClient(
         api_key=os.environ.get("OPENAI_API_KEY"),
+        model=config['model'],
+        voice=config['voice'],
+        instructions=config['instructions'],
         on_text_delta=lambda text: print(f"\nAssistant: {text}", end="", flush=True),
         on_audio_delta=lambda audio: audio_handler.play_audio(audio),
         on_interrupt=lambda: audio_handler.stop_playback_immediately(),
         turn_detection_mode=TurnDetectionMode.SERVER_VAD,
+
         #tools=tools,
     )
 

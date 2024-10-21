@@ -19,9 +19,9 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'vbot=voice_bot.vbot:cli_main',
-            'tbot=voice_bot.tbot:cli_main',
-            'mbot=voice_bot.mbot:main',
+            'vbot=ai_voice_bot.vbot:cli_main',
+            'tbot=ai_voice_bot.tbot:cli_main',
+            'mbot=ai_voice_bot.mbot:main',
         ],
     },
     include_package_data=True,

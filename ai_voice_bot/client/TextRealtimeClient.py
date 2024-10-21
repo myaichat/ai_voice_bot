@@ -54,7 +54,7 @@ class RealtimeClient:
         api_key: str,
         model: str = "gpt-4o-realtime-preview-2024-10-01",
         voice: str = "alloy",
-        instructions: str = "You are a helpful assistant",
+        instructions: str = "You are interview assistant",
         turn_detection_mode: TurnDetectionMode = TurnDetectionMode.MANUAL,
         #tools: Optional[List[BaseTool]] = None,
         on_text_delta: Optional[Callable[[str], None]] = None,
