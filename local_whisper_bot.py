@@ -17,14 +17,10 @@ init(autoreset=True)
 import pyaudio
 
 from typing import Optional
-import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-from transformers import  AutoTokenizer
-import openai
-import os
-import io
-import wave
 
+from ai_voice_bot.transcribe.LocalWhisper import LocalWhisper
+from ai_voice_bot.transcribe.ApiWhisper import ApiWhisper
+from ai_voice_bot.transcribe.GooTranscribe import GooTranscribe   
 
 
 
@@ -144,30 +140,10 @@ class MockRealtimeClient():
         """Initialize the mock client with optional callback."""
         #super().__init__(api_key="mock")
         #self.on_audio_transcript_delta = on_audio_transcript_delta
-    
-        # Set up the Whisper speech-to-text model
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-
-        model_id = "openai/whisper-large-v3"
-        model = AutoModelForSpeechSeq2Seq.from_pretrained(
-            model_id, torch_dtype=self.torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
-        )
-        model.to(self.device)
-        processor = AutoProcessor.from_pretrained(model_id)
-
-        # Set up the speech recognition pipeline
-        self.pipe = pipeline(
-            "automatic-speech-recognition",
-            model=model,
-            tokenizer=processor.tokenizer,
-            feature_extractor=processor.feature_extractor,
-            torch_dtype=self.torch_dtype,
-            device=self.device
-            
-        )
-
         self.chunk = b''
+        self.local_whisper=LocalWhisper()
+        self.api_whisper=ApiWhisper()
+        self.goo_transcribe=GooTranscribe()
 
     async def connect(self) -> None:
         """Mock WebSocket connection for testing."""
@@ -191,104 +167,17 @@ class MockRealtimeClient():
             #print("[Mock Client 111] Handling speech stopped event.")
             # Simulate receiving audio transcript delta after speech stops
             self.on_audio_transcript()
-    def local_transcribe_audio(self):
-        p = pyaudio.PyAudio()
-        channels = 1  # Mono
-        sample_format = pyaudio.paInt16
-        rate = 16000  # Whisper expects 16kHz audio
-        file_name = "temp_audio_chunk.wav"
 
-        # Save the audio chunk to a WAV file
-        wf = wave.open(file_name, 'wb')
-        wf.setnchannels(channels)
-        wf.setsampwidth(p.get_sample_size(sample_format))
-        wf.setframerate(rate)
-        wf.writeframes(self.chunk)
-        wf.close()
-
-        # Read the audio file and convert it to the format expected by the pipeline
-        with wave.open(file_name, 'rb') as wav_file:
-            wav_data = wav_file.readframes(wav_file.getnframes())
-            audio_array = np.frombuffer(wav_data, dtype=np.int16).astype(np.float32) / 32768.0
-
-        # Transcribe the audio using the Whisper pipeline
-        #forced_decoder_ids = self.pipe.model.config.forced_decoder_ids = [[2, self.pipe.tokenizer.lang_code_to_id["en"]]]
-
-        result = self.pipe(audio_array,generate_kwargs = {"task":"transcribe", "language":"<|en|>"} , return_timestamps=True)        
-        #result = self.pipe(audio_array)
-        transcription = result["text"]
-
-        print(f"LOCAL Transcription: {transcription}")
-        ratio = len(transcription)/len(self.chunk)
-        print (f"LOCAl Ratio: {ratio}")        
-
-        # Clear the audio chunk
-        #self.chunk = b''
-
-        # Optionally, remove the temporary file
-        os.remove(file_name)
     def on_audio_transcript(self):
         """Default method in RealtimeClient to handle transcript delta events."""
         from pprint import pprint as pp
-        self.local_transcribe_audio() 
-        self.transcribe_audio() 
-        self.goo_transcribe_audio()
+        self.local_whisper.write_audio(self.chunk)
+        self.local_whisper.local_transcribe_audio(self.chunk)
+        self.api_whisper.transcribe_audio(self.chunk) 
+        self.goo_transcribe.transcribe_audio(self.chunk)
         self.chunk=b'' 
-    def transcribe_audio(self):
-        import os, io, openai, wave
-        openai.api_key = os.environ.get("OPENAI_API_KEY")            
-        p = pyaudio.PyAudio()
-        channels = 1  # Mono
-        sample_format = pyaudio.paInt16
-        rate = 24000
-        file_name = "temp_audio_chunk.wav"
-        wf = wave.open(file_name, 'wb')
-        wf.setnchannels(channels)
-        wf.setsampwidth(p.get_sample_size(sample_format))
-        wf.setframerate(rate)
-        wf.writeframes(self.chunk)
-        wf.close()
-        with open(file_name, 'rb') as audio_file:
-            response = openai.audio.transcriptions.create(
-                model="whisper-1",  # Specify the Whisper model
-                file=audio_file,
-                language="en"
-            )
-            transcription = response.text
-            print(f"API Transcription: {transcription}")  
-            ratio = len(transcription)/len(self.chunk)
-            print (f"API Ratio: {ratio}")
-        #self.chunk=b''          
-    def goo_transcribe_audio(self):
-        import os, io, openai, wave
-        openai.api_key = os.environ.get("OPENAI_API_KEY")            
-        p = pyaudio.PyAudio()
-        channels = 1  # Mono
-        sample_format = pyaudio.paInt16
-        rate = 24000
-        file_name = "temp_audio_chunk.wav"
-        wf = wave.open(file_name, 'wb')
-        wf.setnchannels(channels)
-        wf.setsampwidth(p.get_sample_size(sample_format))
-        wf.setframerate(rate)
-        wf.writeframes(self.chunk)
-        wf.close()
+        
 
-        import speech_recognition as sr
-        recognizer = sr.Recognizer()
-
-        # Open the saved audio file for transcription
-        with sr.AudioFile(file_name) as source:
-            audio = recognizer.record(source)
-
-        try:
-            # Use Google Speech Recognition to transcribe the audio
-            text = recognizer.recognize_google(audio)
-            print(f"Transcription: {text}")
-        except sr.UnknownValueError:
-            print("Sorry, I couldn't understand the audio.")
-        except sr.RequestError as e:
-            print(f"Could not request results from the speech recognition service; {e}")
 
 
         
