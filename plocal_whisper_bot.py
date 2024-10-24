@@ -1,7 +1,8 @@
-import re, asyncio
+import  asyncio
 import unittest
 from unittest.mock import AsyncMock, patch
-
+from pprint import pprint as pp
+import os
 import numpy as np
 
 from colorama import Fore, Back, Style, init
@@ -13,11 +14,14 @@ from colorama import Fore, Back, Style, init
 init(autoreset=True)
 
 
-import asyncio
+
 import pyaudio
-import numpy as np
+
 from typing import Optional
 
+from ai_voice_bot.transcribe.LocalWhisper import LocalWhisper
+from ai_voice_bot.transcribe.ApiWhisper import ApiWhisper
+from ai_voice_bot.transcribe.GooTranscribe import GooTranscribe   
 
 
 
@@ -80,7 +84,7 @@ class MockAudioHandler:
                 if self.is_speech(data):
                     if not self.speech_started:
                         # Speech has just started
-                        print("\n[Speech detected] - Start streaming audio")
+                        print("\n[Speech detected]")
                         await client.handle_event("input_audio_buffer.speech_started")
                         self.speech_started = True
                     
@@ -90,7 +94,7 @@ class MockAudioHandler:
                 else:
                     # Check if it's been quiet for longer than the threshold
                     if self.speech_started and (asyncio.get_event_loop().time() - self.last_speech_time > self.silence_duration_threshold):
-                        print("\n[Speech ended] - Stop streaming audio")
+                        print("\n[Speech ended]")
                         await client.handle_event("input_audio_buffer.speech_stopped")
                         self.speech_started = False
 
@@ -100,6 +104,7 @@ class MockAudioHandler:
 
             except Exception as e:
                 print(f"Error streaming: {e}")
+                raise e
                 break
             await asyncio.sleep(0.01)
 
@@ -135,7 +140,11 @@ class MockRealtimeClient():
     def __init__(self, on_audio_transcript_delta=None):
         """Initialize the mock client with optional callback."""
         #super().__init__(api_key="mock")
-        self.on_audio_transcript_delta = on_audio_transcript_delta
+        #self.on_audio_transcript_delta = on_audio_transcript_delta
+        self.chunk = b''
+        self.local_whisper=LocalWhisper()
+        self.api_whisper=ApiWhisper()
+        self.goo_transcribe=GooTranscribe()
 
     async def connect(self) -> None:
         """Mock WebSocket connection for testing."""
@@ -143,42 +152,54 @@ class MockRealtimeClient():
 
     async def stream_audio(self, audio_chunk: bytes):
         """Mock method to stream audio chunks to WebSocket."""
-        print(f"Streaming audio chunk of size {len(audio_chunk)}")
+        #print(f"Streaming audio chunk of size {len(audio_chunk)}")
+        self.chunk +=audio_chunk
+        #print(f"Streaming audio chunk of size {len(audio_chunk)}, {len(self.chunk)}")
+
 
     async def handle_event(self, event_type):
         """Handle events such as speech_started and speech_stopped."""
-        print(event_type)
+        #print(event_type)
         if event_type == "input_audio_buffer.speech_started":
-            print("[Mock Client] Handling speech started event.")
+            #print("[Mock Client] Handling speech started event.")
+            pass
 
         elif event_type == "input_audio_buffer.speech_stopped":
-            print("[Mock Client 111] Handling speech stopped event.")
+            #print("[Mock Client 111] Handling speech stopped event.")
             # Simulate receiving audio transcript delta after speech stops
-            sentence = f"This is the {Fore.BLACK}{Back.YELLOW}>>>MOCKED<<<{Style.RESET_ALL} model answer to your question."
+            await self.on_audio_transcript()
 
-            # Use regex to split the sentence while preserving spaces
-            split = re.findall(r'\S+|\s+', sentence)
-
-            for word in split:
-                await self.simulate_audio_transcript_delta(word)
-
-    async def simulate_audio_transcript_delta(self, word: str):
-        """Simulate the response from the WebSocket with an audio transcript delta."""
-        # Simulate a small delay after speech stops to receive the transcript
-        await asyncio.sleep(0.07)
-        
-        # Simulated transcript response event
-        event = {
-            "type": "response.audio_transcript.delta",
-            "delta": word
-        }
-        
-        # Invoke the on_audio_transcript_delta callback if provided
-        if self.on_audio_transcript_delta:
-            self.on_audio_transcript_delta(word)
-    def on_audio_transcript_delta(self, event):
+    async def on_audio_transcript(self):
         """Default method in RealtimeClient to handle transcript delta events."""
-        print(event, end="", flush=True)
+        
+        """Handle transcript delta events by kicking off tasks in parallel."""
+        file_name: str = "temp_audio_chunk.wav"
+        self.local_whisper.write_audio(self.chunk)
+        if 0:
+            tasks = [
+            
+                asyncio.to_thread(self.local_whisper.local_transcribe_audio,self.chunk),
+                asyncio.to_thread(self.api_whisper.transcribe_audio,self.chunk),
+                asyncio.to_thread(self.goo_transcribe.transcribe_audio,self.chunk)
+            ]
+        else:
+            tasks = [
+                
+                asyncio.to_thread(self.local_whisper.local_transcribe_audio, self.chunk),
+                asyncio.to_thread(self.api_whisper.transcribe_audio, self.chunk),
+                asyncio.to_thread(self.goo_transcribe.transcribe_audio, self.chunk)
+            ]
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks)
+        self.chunk = b''  # Reset the chunk after processing
+        self.chunk=b'' 
+        os.remove(file_name)
+        
+
+
+
+        
+
         
 # Test case for the RealtimeClient with mock WebSocket
 class TestRealtimeClient(unittest.TestCase):
@@ -188,7 +209,7 @@ class TestRealtimeClient(unittest.TestCase):
             audio_handler = MockAudioHandler()
 
             # Initialize the mocked client with an audio transcript delta callback
-            if 1:
+            if 0:
                 client = MockRealtimeClient(
                     on_audio_transcript_delta=lambda event: print(f"Mocked Transcript Response: {event['delta']}")
                 )

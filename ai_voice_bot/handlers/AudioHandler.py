@@ -4,7 +4,7 @@ import wave
 import queue
 import io
 from typing import Optional
-
+import numpy as np
 from pydub import AudioSegment
 import threading
 
@@ -38,7 +38,7 @@ class AudioHandler:
         self.format = pyaudio.paInt16
         self.channels = 1
         self.rate = 24000
-        self.chunk = 1024
+        self.chunk = 1024*10
 
         self.audio = pyaudio.PyAudio()
 
@@ -51,6 +51,11 @@ class AudioHandler:
         self.streaming = False
         self.stream = None
 
+        # Threshold for detecting speech (based on amplitude)
+        self.speech_threshold = 500  # Adjust this value as needed
+        self.silence_duration_threshold = 1.0  # 1 second of silence considered speech stop        
+        self.last_speech_time = None
+        self.speech_started = False
         # Playback params
         self.playback_stream = None
         self.playback_buffer = queue.Queue(maxsize=20)
@@ -115,7 +120,11 @@ class AudioHandler:
         # Get the WAV data
         wav_buffer.seek(0)
         return wav_buffer.read()
-
+    def is_speech(self, audio_chunk: bytes) -> bool:
+        """Determine if an audio chunk contains speech based on amplitude."""
+        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+        max_amplitude = np.max(np.abs(audio_data))
+        return max_amplitude > self.speech_threshold
     async def start_streaming(self, client):
         """Start continuous audio streaming."""
         if self.streaming:
@@ -136,8 +145,30 @@ class AudioHandler:
             try:
                 # Read raw PCM data
                 data = self.stream.read(self.chunk, exception_on_overflow=False)
-                # Stream directly without trying to decode
-                await client.stream_audio(data)
+
+                # Check if the chunk contains speech
+                if self.is_speech(data):
+                    if not self.speech_started:
+                        # Speech has just started
+                        print("\n[Speech detected]")
+                        await client.handle_event("input_audio_buffer.speech_started")
+                        self.speech_started = True
+                    
+                    # Reset the silence duration
+                    self.last_speech_time = asyncio.get_event_loop().time()
+
+                else:
+                    # Check if it's been quiet for longer than the threshold
+                    if self.speech_started and (asyncio.get_event_loop().time() - self.last_speech_time > self.silence_duration_threshold):
+                        print("\n[Speech ended]")
+                        await client.handle_event("input_audio_buffer.speech_stopped")
+                        self.speech_started = False
+
+                # Stream the audio to the client only if speech is ongoing
+                if self.speech_started:
+                    await client.stream_audio(data)
+
+
             except Exception as e:
                 print(f"Error streaming: {e}")
                 break

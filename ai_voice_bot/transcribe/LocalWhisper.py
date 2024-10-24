@@ -1,6 +1,7 @@
 import pyaudio
 import wave
-import os
+import os, time
+from pprint import pprint as pp 
 import numpy as np
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -28,12 +29,12 @@ class LocalWhisper():
             
         )
 
-    def write_audio(self,  audio_chunk: bytes, file_name: str = "temp_audio_chunk.wav"):  
+    def write_audio(self,  audio_chunk: bytes, file_name):  
         p = pyaudio.PyAudio()
         channels = 1  # Mono
         sample_format = pyaudio.paInt16
         rate = 16000  # Whisper expects 16kHz audio
-        file_name = "temp_audio_chunk.wav"
+        #file_name = "temp_audio_chunk.wav"
 
         # Save the audio chunk to a WAV file
         wf = wave.open(file_name, 'wb')
@@ -44,7 +45,7 @@ class LocalWhisper():
         wf.close()        
     def local_transcribe_audio(self, audio_chunk, file_name="temp_audio_chunk.wav"):
 
-
+        start_time = time.time()
         # Read the audio file and convert it to the format expected by the pipeline
         with wave.open(file_name, 'rb') as wav_file:
             wav_data = wav_file.readframes(wav_file.getnframes())
@@ -56,13 +57,16 @@ class LocalWhisper():
         result = self.pipe(audio_array,generate_kwargs = {"task":"transcribe", "language":"<|en|>"} , return_timestamps=True)        
         #result = self.pipe(audio_array)
         transcription = result["text"]
-
-        print(f"LOCAL Transcription: {transcription}")
-        ratio = len(transcription)/len(audio_chunk)
-        print (f"LOCAl Ratio: {ratio}")        
+        #pp(result)
+        if 0:
+            print(f"LOCAL Transcription: {transcription}")
+            ratio = len(transcription)/len(audio_chunk)
+            print (f"LOCAl Ratio: {ratio}")        
 
         # Clear the audio chunk
         #self.chunk = b''
 
         # Optionally, remove the temporary file
-        os.remove(file_name)
+        #os.remove(file_name)
+        ratio = len(transcription)/len(audio_chunk)
+        return result, time.time() - start_time, ratio
