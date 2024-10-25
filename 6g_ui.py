@@ -68,7 +68,9 @@ class TranscriptionListPanel(wx.Panel):
     def  on_stream_closed(self, data):
         transcript, corrected_time, tid=    data
         #print (7777, tid, transcript, corrected_time, tid)
-        self.add_row((str(tid), transcript))
+        if transcript.strip():
+
+            self.add_row((str(tid), transcript))
     def add_row(self, row):
         index = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), row[0])
         self.list_ctrl.SetItem(index, 1, row[1])
@@ -125,7 +127,7 @@ class TranscriptionListPanel(wx.Panel):
         # Create a chat completion request with streaming enabled
         #pp(conversation_history)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=ch, 
 
             stream=True
@@ -186,6 +188,21 @@ class TranscriptionTextPanel(wx.Panel):
             self.text_ctrl.SetValue('')
         old=self.text_ctrl.GetValue()
         self.text_ctrl.SetValue(old+response)
+import wx.html2
+class WebViewPanel(wx.Panel):
+    def __init__(self, parent):
+        super(WebViewPanel, self).__init__(parent)
+
+        # Create the WebView control
+        self.web_view = wx.html2.WebView.New(self)
+
+        # Load a default page or URL
+        self.web_view.LoadURL("https://www.example.com")  # Set the URL as needed
+
+        # Layout for the WebView in this panel
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.web_view, 1, wx.EXPAND | wx.ALL, 5)
+        self.SetSizer(sizer)
 
 class MyFrame(wx.Frame):
     def __init__(self, *args, **kw):
@@ -203,12 +220,17 @@ class MyFrame(wx.Frame):
         self.list_panel = TranscriptionListPanel(left_notebook)
         left_notebook.AddPage(self.list_panel, "Transcriptions")
 
+
        # Right Notebook for TextCtrl
         right_notebook = wx.Notebook(splitter)
 
         # Create TranscriptionTextPanel and add it to the right notebook
         self.text_panel = TranscriptionTextPanel(right_notebook)
-        right_notebook.AddPage(self.text_panel, "Details")
+        right_notebook.AddPage(self.text_panel, "Text")
+        # Add WebView Panel tab
+        self.web_view_panel = WebViewPanel(right_notebook)
+        right_notebook.AddPage(self.web_view_panel, "WebView")   
+        right_notebook.SetSelection(1)     
 
         # Split the main splitter window vertically between the left and right notebooks
         splitter.SplitVertically(left_notebook, right_notebook)
