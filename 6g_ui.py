@@ -284,7 +284,7 @@ class AsyncProcessor:
                 i = 0
                 if not content:
                     continue
-                print(content, end='', flush=True)
+                #print(content, end='', flush=True)
                 await self.queue.put(content)
                 await asyncio.sleep(0)                  
                 while i < len(content):
@@ -370,6 +370,11 @@ class AsyncProcessor:
         #pub.sendMessage("display_response", response='<br><br>')
         await self.queue.put('\n\n\n')    
         return None
+import re
+import markdown2
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
 class AppLog_Controller():
     def __init__(self):
         self.set_log()
@@ -385,6 +390,7 @@ class AppLog_Controller():
          
         self.applog.append({'text':msg,'type':'header'})
         self.applog.append({'text':'','type':'info'})
+        self.replace_header(msg)
     def done_display(self, response):
         
         self.applog.append('<br><br>')
@@ -392,12 +398,92 @@ class AppLog_Controller():
     def display_response(self, response):
         #e()
         if not self.applog:
-            self.applog.append({'text':response,'type':'info'})
+            row={'text':response,'type':'info'}
+            self.applog.append(row)
         else:
             row = self.applog[-1] 
             row["text"] +=response #.replace("\n", "<br>")
             self.applog[-1]=row
-        wx.CallAfter(self.refresh_log)
+        #self.add_log_entry(response)
+        
+        self.replace_log_content(row["text"] )   
+        #wx.CallAfter(self.refresh_log)
+       
+    def replace_log_content(self, content):
+        # Step 1: Convert Markdown to HTML with fenced code blocks enabled
+        html_content = markdown2.markdown(content, extras=["fenced-code-blocks"])
+
+        # Step 2: Initialize Pygments formatter with inline CSS for syntax highlighting
+        formatter = HtmlFormatter(nowrap=True, style="colorful")
+        css_styles = formatter.get_style_defs('.highlight')
+
+        # Custom block code styling (includes font-size and background)
+        block_code_style = (
+            "background-color: #f4f4f4; color: #008000; padding: 10px; "
+            "border-radius: 5px; font-family: monospace;  line-height: 1.8; font-size: 10px;"
+        )
+        # Inline code styling (for single-line inline code snippets)
+        inline_code_style = "background-color: #f4f4f4; color: #008000; font-family: monospace; font-size: 14px; padding: 2px 4px; border-radius: 3px;"
+
+        custom_code_style = """
+                code {
+                    font-family: "Courier New", Courier, monospace;
+                    font-size: 0.875em;
+                    color: #2d2d2d;
+                    background-color: #f6f6f6;
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    white-space: nowrap;
+                    overflow-wrap: break-word;
+                }
+                pre code {
+                    font-family: "Courier New", Courier, monospace;
+                    font-size: 0.875em;
+                    color: #2d2d2d;
+                    background-color: #f6f6f6;
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    white-space: pre;
+                    overflow-wrap: break-word;
+                }
+            """
+
+
+
+        # Replace <pre><code>...</code></pre> blocks with highlighted HTML
+        highlighted_html_content =  html_content.replace(
+                    '<code>', f'<code style="{inline_code_style}">'
+                ).replace(
+                    '<pre><code>', f'<pre style="{block_code_style}"><code>'
+                ).replace(
+                    '</code></pre>', '</code></pre>'
+                )
+
+
+        # Step 4: Assemble final HTML with Pygments CSS for syntax colors
+        final_content = f"""
+        <style>
+            {css_styles}
+            {custom_code_style}
+            /* Specific token coloring to make keywords and operators green */
+            .highlight .k, .highlight .n, .highlight .o {{ color: #008000; }}
+        </style>
+        {highlighted_html_content}
+        """
+
+        # Escape backticks for JavaScript compatibility
+        sanitized_content = final_content.replace("`", "\\`")
+        
+        # Inject the processed HTML content into the webview
+        self.web_view.RunScript(f"replaceLogContent(`{sanitized_content}`);")
+    def replace_header(self, content):
+        # Use JavaScript to replace content in the header row
+        sanitized_content = content.replace("`", "\\`")  # Escape backticks for JavaScript
+        self.web_view.RunScript(f"replaceHeader(`{sanitized_content}`);")
+    def append_log_content(self, content):
+        # Use JavaScript to append content to the single row
+        sanitized_content = content.replace("`", "\\`")  # Escape backticks for JavaScript
+        self.web_view.RunScript(f"appendToLog(`{sanitized_content}`);")
    
     def _on_log(self, msg, type):
     
@@ -420,8 +506,8 @@ class AppLog_Controller():
         out=f'<table style="font-size: 16px;">'
         # Block code styling (for fenced code blocks)
         block_code_style = (
-            "background-color: #f4f4f4; color: #008000; padding: 12px; "
-            "border-radius: 5px; font-family: monospace; line-height: 1.8;"
+            "background-color: #f4f4f4; color: #008000; padding: 10px; "
+            "border-radius: 5px; font-family: monospace;  line-height: 1.8; font-size: 10px;"
         )
         # Inline code styling (for single-line inline code snippets)
         inline_code_style = "background-color: #f4f4f4; color: #008000; font-family: monospace; padding: 2px 4px; border-radius: 3px;"
@@ -532,9 +618,135 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
     def attach_custom_scheme_handler(self):
         handler = CustomSchemeHandler_Log(self)
         self.web_view.RegisterHandler(handler)
-    
-
     def set_initial_content(self):
+        initial_html = """
+        <html>
+        <head>
+        <style>
+            /* Apply styling to the table with a class */
+            #log-table {
+                font-family: Arial, sans-serif;   /* Basic, clean font */
+                font-size: 16px;                  /* Regular font size */
+                line-height: 1.5;                 /* Readable line spacing */
+                color: #2d2d2d;                   /* Dark gray color */
+                width: 100%;                      /* Full width */
+                border-collapse: collapse;        /* Remove spacing between cells */
+            }
+
+            /* Styling for the header cell */
+            #header-cell {
+                font-weight: bold;
+                font-size: 20px;
+                padding: 10px;                    /* Add some padding */
+                background-color: #f6f6f6;        /* Light background for header */
+                border-bottom: 1px solid #ddd;    /* Border below header */
+            }
+
+            /* Styling for other table rows and cells */
+            #log-cell {
+                padding: 10px;
+            }
+
+            hr {
+                border: 0;
+                border-top: 1px solid #ddd;
+                margin: 0;
+            }
+        </style>
+        </head>
+        <body>
+            <table id="log-table">
+                <tr id="header-row">
+                    <td id="header-cell">Initial Header</td>
+                </tr>
+                <tr><td><hr></td></tr>
+                <tr id="log-row">
+                    <td id="log-cell"></td>
+                </tr>
+            </table>
+            <script>
+                // Function to replace header content
+                function replaceHeader(content) {
+                    const headerCell = document.getElementById('header-cell');
+                    headerCell.innerHTML = content;
+                }
+                
+                // Function to replace log content
+                function replaceLogContent(content) {
+                    const logCell = document.getElementById('log-cell');
+                    logCell.innerHTML = content;
+                }
+            </script>
+        </body>
+        </html>
+        """
+        self.web_view.SetPage(initial_html, "")
+
+
+    def _set_initial_content(self):
+        initial_html = """
+        <html>
+        <body>
+        <table id="log-table" style="font-size: 16px;">
+            <tr id="log-row">
+                <td id="log-cell"></td>
+            </tr>
+        </table>
+        <script>
+            function replaceLogContent(content) {
+                const cell = document.getElementById('log-cell');
+                cell.innerHTML = content;
+            }
+        </script>
+        </body>
+        </html>
+        """
+        self.web_view.SetPage(initial_html, "")
+
+    def _set_initial_content(self):
+        initial_html = """
+        <html>
+        <body>
+        <table id="log-table" style="font-size: 16px;">
+            <tr id="log-row">
+                <td id="log-cell"></td>
+            </tr>
+        </table>
+        <script>
+            function appendToLog(content) {
+                const cell = document.getElementById('log-cell');
+                cell.innerHTML += content + "<br>";
+            }
+        </script>
+        </body>
+        </html>
+        """
+        self.web_view.SetPage(initial_html, "")
+    def _set_initial_content(self):
+        html = self.get_log_html()
+        initial_html = f"""
+        <html>
+        <body>
+        <table id="log-table" style="font-size: 16px;">{html}</table>
+        <script>
+            function addLogEntry(content) {{
+                const table = document.getElementById('log-table');
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.innerHTML = content;
+                row.appendChild(cell);
+                table.appendChild(row);
+            }}
+        </script>
+        </body>
+        </html>
+        """
+        self.web_view.SetPage(initial_html, "")    
+    def add_log_entry(self, content):
+        # Call the JavaScript function to add a log entry
+        self.web_view.RunScript(f"addLogEntry(`{content}`);")
+
+    def _set_initial_content(self):
         html=self.get_log_html()
         initial_html = """
         <html>
