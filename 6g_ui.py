@@ -446,7 +446,7 @@ class AppLog_Controller():
                 )
                 out += f'<tr><td>{text}</td></tr>'
         out += "</table>"
-        pp(out)
+        #pp(out)
         return out
     def get_hist_log_html(self):
         #header="<h1>App Log</h1>"
