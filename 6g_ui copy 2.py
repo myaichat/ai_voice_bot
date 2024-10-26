@@ -3,10 +3,11 @@
 import wx
 import sys
 import time
-
+from itertools import tee
 from pubsub import pub
 from google.cloud import speech
 from ai_voice_bot.goog.ResumableMicrophoneStream import ResumableMicrophoneStream, listen_print_loop
+#from ai_voice_bot.goog.ResumableMicrophoneMultiStream import ResumableMicrophoneMultiStream, listen_print_loop
 import threading
 import openai
 SAMPLE_RATE = 16000
@@ -127,8 +128,7 @@ class TranscriptionListPanel(wx.Panel):
         # Create a chat completion request with streaming enabled
         #pp(conversation_history)
         response = client.chat.completions.create(
-            #model="gpt-3.5-turbo",
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=ch, 
 
             stream=True
@@ -204,7 +204,62 @@ class WebViewPanel(wx.Panel):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.web_view, 1, wx.EXPAND | wx.ALL, 5)
         self.SetSizer(sizer)
+def long_running_process():
+    """start bidirectional streaming from microphone input to speech API"""
+    client = speech.SpeechClient()
+    config = speech.RecognitionConfig(
+        encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+        sample_rate_hertz=SAMPLE_RATE,
+        language_code="en-US",
+        max_alternatives=3,
+        model='latest_long',
+    )
 
+    streaming_config = speech.StreamingRecognitionConfig(
+        config=config, interim_results=True
+    )
+
+    mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
+    print(mic_manager.chunk_size)
+    sys.stdout.write(YELLOW)
+    sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
+    sys.stdout.write("End (ms)       Transcript Results/Status\n")
+    sys.stdout.write("=====================================================\n")
+
+    with mic_manager as stream:
+        while not stream.closed:
+            sys.stdout.write(YELLOW)
+            sys.stdout.write(
+                "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
+            )
+
+            stream.audio_input = []
+            #print("NEW STREAM")
+            #stream.start_stream()
+            audio_generator = stream.generator()
+
+            requests = (
+                speech.StreamingRecognizeRequest(audio_content=content)
+                for content in audio_generator
+            )
+
+            responses = client.streaming_recognize(streaming_config, requests)
+
+            # Now, put the transcription responses to use.
+            listen_print_loop(responses, stream)
+
+            if stream.result_end_time > 0:
+                stream.final_request_end_time = stream.is_final_end_time
+            stream.result_end_time = 0
+            stream.last_audio_input = []
+            stream.last_audio_input = stream.audio_input
+            stream.audio_input = []
+            stream.restart_counter = stream.restart_counter + 1
+
+            if not stream.last_transcript_was_final:
+                sys.stdout.write("\n")
+            stream.new_stream = True
+            print("NEW STREAM")
 class MyFrame(wx.Frame):
     def __init__(self, *args, **kw):
         super(MyFrame, self).__init__(*args, **kw)
@@ -250,10 +305,31 @@ class MyFrame(wx.Frame):
 
         # Start the long-running process in a background thread
 
-        
+        if 0:
+            from multiprocessing import Process
+            long_running_process_1 = Process(target=long_running_process)
+            long_running_process_1.start()
+            if 0:
+                time.sleep(1)
+                # Second process
+                long_running_process_2 = Process(target=long_running_process)
+                long_running_process_2.start()
+                time.sleep(1)
+                long_running_process_3 = Process(target=long_running_process)
+                long_running_process_3.start()
+                time.sleep(1)
+                long_running_process_4 = Process(target=long_running_process)
+                long_running_process_4.start()                
+
+            # Optionally, wait for both processes to complete
+            #long_running_process_1.join()
+            if 0:
+                long_running_process_2.join()  
+                long_running_process_3.join() 
+                long_running_process_4.join()         
 
         if 1:        
-            self.long_running_thread = threading.Thread(target=self.long_running_process)
+            self.long_running_thread = threading.Thread(target=long_running_process)
             self.long_running_thread.start()
 
 
@@ -274,59 +350,13 @@ class MyFrame(wx.Frame):
         #print(pid, "completed!")
 
 
-    def long_running_process(self):
-        """start bidirectional streaming from microphone input to speech API"""
-        client = speech.SpeechClient()
-        config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=SAMPLE_RATE,
-            language_code="en-US",
-            max_alternatives=1,
-        )
 
-        streaming_config = speech.StreamingRecognitionConfig(
-            config=config, interim_results=True
-        )
 
-        mic_manager = ResumableMicrophoneStream(SAMPLE_RATE, CHUNK_SIZE)
-        print(mic_manager.chunk_size)
-        sys.stdout.write(YELLOW)
-        sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
-        sys.stdout.write("End (ms)       Transcript Results/Status\n")
-        sys.stdout.write("=====================================================\n")
 
-        with mic_manager as stream:
-            while not stream.closed:
-                sys.stdout.write(YELLOW)
-                sys.stdout.write(
-                    "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
-                )
 
-                stream.audio_input = []
-                audio_generator = stream.generator()
 
-                requests = (
-                    speech.StreamingRecognizeRequest(audio_content=content)
-                    for content in audio_generator
-                )
 
-                responses = client.streaming_recognize(streaming_config, requests)
 
-                # Now, put the transcription responses to use.
-                listen_print_loop(responses, stream)
-
-                if stream.result_end_time > 0:
-                    stream.final_request_end_time = stream.is_final_end_time
-                stream.result_end_time = 0
-                stream.last_audio_input = []
-                stream.last_audio_input = stream.audio_input
-                stream.audio_input = []
-                stream.restart_counter = stream.restart_counter + 1
-
-                if not stream.last_transcript_was_final:
-                    sys.stdout.write("\n")
-                stream.new_stream = True
-                print("NEW STREAM")
 
     def enable_button(self):
         # Enable the button when the long-running task is done
