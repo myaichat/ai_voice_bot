@@ -30,7 +30,7 @@ def get_current_time() -> int:
     return int(round(time.time() * 1000))
 
 
-class ResumableMicrophoneStream:
+class ResumableMicrophoneMultiStream:
     """Opens a recording stream as a generator yielding the audio chunks."""
 
     def __init__(
@@ -52,15 +52,26 @@ class ResumableMicrophoneStream:
         self._num_channels = 1
         self._buff = queue.Queue()
         self.closed = True
-        self.start_time = get_current_time()
+        self.start_time={}
+        self.start_time['gen_1'] = get_current_time()
+        self.start_time['gen_2'] = get_current_time()
         self.restart_counter = 0
         self.audio_input = []
         self.last_audio_input = []
-        self.result_end_time = 0
-        self.is_final_end_time = 0
+        #self.result_end_time = 0
+        self.result_end_time={}
+        self.result_end_time['gen_1'] = 0
+        self.result_end_time['gen_2'] = 0        
+        
+        self.is_final_end_time={}
+        self.is_final_end_time['gen_1'] = 0
+        self.is_final_end_time['gen_2'] = 0          
         self.final_request_end_time = 0
         self.bridging_offset = 0
-        self.last_transcript_was_final = False
+        #self.last_transcript_was_final = False
+        self.last_transcript_was_final={}
+        self.last_transcript_was_final['gen_1'] = False
+        self.last_transcript_was_final['gen_2'] = False           
         self.new_stream = True
         self._audio_interface = pyaudio.PyAudio()
         self._audio_stream = self._audio_interface.open(
@@ -128,7 +139,36 @@ class ResumableMicrophoneStream:
         """
         self._buff.put(in_data)
         return None, pyaudio.paContinue
+    def start_stream(self):
+        # Start the main generator in a background thread
+        #print("start_stream")
+        threading.Thread(target=self._feed_queues, daemon=True).start()   
+    def external_generator_1(self: object) -> object:
+        queue_name = "generator1"
+        while True:
+            data_chunk = self.queues[queue_name].get()
+            print(11, len(data_chunk))
+            if data_chunk is None:
+                break            
+            #print(len(data_chunk))
 
+            yield data_chunk
+    def external_generator_2(self: object) -> object:
+        queue_name = "generator2"
+        while True:
+            data_chunk = self.queues[queue_name].get()
+            print(222, len(data_chunk))
+            if data_chunk is None:
+                break            
+            #print(len(data_chunk))
+
+            yield data_chunk            
+    def _feed_queues(self):
+        """Runs the generator and feeds its output to the queues."""
+        for data_chunk in self.generator():
+            # Data is already put in the queues by generator itself, so this loop
+            # simply runs to keep the generator producing data.
+            pass
     def generator(self: object) -> object:
         """Stream Audio from microphone to API and to local buffer
 
@@ -138,6 +178,11 @@ class ResumableMicrophoneStream:
         returns:
             The data from the audio stream.
         """
+        self.queues = {
+            "generator1": queue.Queue(),
+            "generator2": queue.Queue()
+        }
+        self.closed = False        
         while not self.closed:
             data = []
 
@@ -172,6 +217,9 @@ class ResumableMicrophoneStream:
             self.audio_input.append(chunk)
 
             if chunk is None:
+                self.queues["generator1"].put(None)
+                self.queues["generator2"].put(None)    
+                self.closed = True            
                 return
             data.append(chunk)
             # Now consume whatever other data's still buffered.
@@ -180,17 +228,23 @@ class ResumableMicrophoneStream:
                     chunk = self._buff.get(block=False)
 
                     if chunk is None:
+                        self.queues["generator1"].put(None)
+                        self.queues["generator2"].put(None)
+                        self.closed = True                        
                         return
                     data.append(chunk)
                     self.audio_input.append(chunk)
 
                 except queue.Empty:
                     break
+            data_chunk = b"".join(data)
+            #print(111, len(data_chunk)) 
+            self.queues["generator1"].put(data_chunk)
+            self.queues["generator2"].put(data_chunk)
+            yield data_chunk
 
-            yield b"".join(data)
 
-
-def listen_print_loop(responses: object, stream: object) -> None:
+def listen_print_loop(gen,responses: object, stream: object) -> None:
     """Iterates through server responses and prints them.
 
     The responses passed is a generator that will block until a response
@@ -212,8 +266,8 @@ def listen_print_loop(responses: object, stream: object) -> None:
     tid=0
     start_time=0
     for response in responses:
-        if get_current_time() - stream.start_time > STREAMING_LIMIT:
-            stream.start_time = get_current_time()
+        if get_current_time() - stream.start_time[gen] > STREAMING_LIMIT:
+            stream.start_time[gen] = get_current_time()
             break
 
         if not response.results:
@@ -235,10 +289,10 @@ def listen_print_loop(responses: object, stream: object) -> None:
         if result.result_end_time.microseconds:
             result_micros = result.result_end_time.microseconds
 
-        stream.result_end_time = int((result_seconds * 1000) + (result_micros / 1000))
+        stream.result_end_time[gen] = int((result_seconds * 1000) + (result_micros / 1000))
 
         corrected_time = (
-            stream.result_end_time
+            stream.result_end_time[gen]
             - stream.bridging_offset
             + (STREAMING_LIMIT * stream.restart_counter)
         )
@@ -248,22 +302,13 @@ def listen_print_loop(responses: object, stream: object) -> None:
         if result.is_final:
             sys.stdout.write(GREEN)
             sys.stdout.write("\033[K")
-            elapsed_time=stream.result_end_time -start_time
-            sys.stdout.write(str(elapsed_time)+ ": "+str(tid)  + ": "+str(corrected_time) + ": " + transcript + "\n")
+            elapsed_time=stream.result_end_time[gen] -start_time
+            sys.stdout.write(gen+ ": "+ str(elapsed_time)+ ": "+str(tid)  + ": "+str(corrected_time) + ": " + transcript + "\n")
             pub.sendMessage("stream_closed", data=(transcript, corrected_time, tid))
-            if len(result.alternatives) > 1:
-                transcript = result.alternatives[1].transcript
-                sys.stdout.write(str(elapsed_time)+ ": "+str(tid)  + ": "+str(corrected_time) + ": " + transcript + "\n")
-                pub.sendMessage("stream_closed", data=(transcript, corrected_time, tid))
-                if len(result.alternatives) > 2:
-                    transcript = result.alternatives[2].transcript
-                    sys.stdout.write(str(elapsed_time)+ ": "+str(tid)  + ": "+str(corrected_time) + ": " + transcript + "\n")
-                    pub.sendMessage("stream_closed", data=(transcript, corrected_time, tid))
-           
-            stream.is_final_end_time = stream.result_end_time
-            stream.last_transcript_was_final = True
+            stream.is_final_end_time[gen] = stream.result_end_time[gen]
+            stream.last_transcript_was_final[gen] = True
             tid += 1
-            start_time=stream.result_end_time 
+            start_time=stream.result_end_time[gen] 
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
@@ -280,4 +325,4 @@ def listen_print_loop(responses: object, stream: object) -> None:
                 sys.stdout.write("\033[K")
                 sys.stdout.write(str(corrected_time) + ": " + transcript + "\r")
 
-            stream.last_transcript_was_final = False
+            stream.last_transcript_was_final[gen] = False
