@@ -36,7 +36,8 @@ class TranscriptionListCtrl(wx.ListCtrl):
         self.InsertColumn(1, 'Transcription', width=150)
         font = self.GetFont()
         font.SetPointSize(12)  # Increase point size for larger font
-        self.SetFont(font)        
+        self.SetFont(font) 
+        pub.subscribe(self.on_test_populate, "test_populate")       
 
     def populate_list(self, data):
         """Populate the ListCtrl with data."""
@@ -44,7 +45,7 @@ class TranscriptionListCtrl(wx.ListCtrl):
         for i, transcription in enumerate(data):
             index = self.InsertItem(i, str(i))
             self.SetItem(index, 1, transcription)
-    def test(self):
+    def on_test_populate(self):
         # Clear the list before populating
         self.DeleteAllItems()
 
@@ -65,12 +66,11 @@ class TranscriptionListPanel(wx.Panel):
 
         # Create the ListCtrl within this panel
         self.list_ctrl = TranscriptionListCtrl(self)
-        self.button = wx.Button(self, label='Populate List')
-        self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
+
         # Layout for the ListCtrl in this panel
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 5)
-        sizer.Add(self.button, 0, wx.EXPAND | wx.ALL, 5)
+
         self.SetSizer(sizer)
         self.Bind(wx.EVT_SIZE, self.on_resize)
         
@@ -86,9 +86,7 @@ class TranscriptionListPanel(wx.Panel):
         #self.client= openai.OpenAI()
         pub.subscribe(self.on_stream_closed, "stream_closed")  
         pub.subscribe(self.on_ask_model_event, "ask_model")
-    def on_button_click(self, event):
-        #pub.sendMessage("applog", msg="Button clicked", type="info")
-        self.test()        
+      
     def  on_stream_closed(self, data):
         transcript, corrected_time, tid=    data
         #print (7777, tid, transcript, corrected_time, tid)
@@ -108,8 +106,7 @@ class TranscriptionListPanel(wx.Panel):
         #asyncio.run(self.async_process(row[0]))
         #threading.Thread(target=self.threaded_process, args=(row[0],)).start()
 
-    def test(self):
-        self.list_ctrl.test()
+
     def populate_list(self, data):
         """Interface method to populate the list in the embedded ListCtrl."""
         self.list_ctrl.populate_list(data)
@@ -1034,17 +1031,17 @@ class TranscriptionTreePanel(wx.Panel):
         super().__init__(parent)
         self.tree = MultiLineTreeCtrl(self)
         # Add root and example items
-        root = self.tree.AddRoot("Root")
-        
-        # Add multiline items
-        parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
-        child1 = self.tree.AppendMultilineItem(parent1, "This is a child item\nwith two lines")
-        child2 = self.tree.AppendMultilineItem(parent1, "Another child Another child Another child Another child Another child Another child Another child Another child Another child\nwith even more\nlines of text\nto display")
-        child3 = self.tree.AppendMultilineItem(child2, "Another child\nwith even more\nlines of text\nto display")
-        parent2 = self.tree.AppendMultilineItem(root, "Parent Item 2\nAlso multiline")
-        
-        # Expand all items
-        self.tree.ExpandAll()
+        self.root = self.tree.AddRoot("Root")
+        if 0:
+            # Add multiline items
+            parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
+            child1 = self.tree.AppendMultilineItem(parent1, "This is a child item\nwith two lines")
+            child2 = self.tree.AppendMultilineItem(parent1, "Another child Another child Another child Another child Another child Another child Another child Another child Another child\nwith even more\nlines of text\nto display")
+            child3 = self.tree.AppendMultilineItem(child2, "Another child\nwith even more\nlines of text\nto display")
+            parent2 = self.tree.AppendMultilineItem(root, "Parent Item 2\nAlso multiline")
+            
+            # Expand all items
+            self.tree.ExpandAll()
         
         # Layout the frame
         
@@ -1052,18 +1049,27 @@ class TranscriptionTreePanel(wx.Panel):
         sizer.Add(self.tree, 1, wx.EXPAND)
         self.SetSizer(sizer)
         self.Layout()
-     
-class MyFrame(wx.Frame):
-    def __init__(self,queue, *args, **kw):
-        super(MyFrame, self).__init__(*args, **kw)
+        pub.subscribe(self.on_test_populate, "test_populate") 
+    def on_test_populate(self):
+        print('on_test_populate')
+        #self.tree.DeleteAllItems()
+        root = self.root
+        
+        # Add multiline items
+        parent1 = self.tree.AppendMultilineItem(root, "Tell me more about Oracle")
+        child1 = self.tree.AppendMultilineItem(parent1, "Tell me more about Oracle PL/SQL")
+        child2 = self.tree.AppendMultilineItem(parent1, "Tell me more about Oracle Hints")
+        child3 = self.tree.AppendMultilineItem(child2, "Tell me more about Apache Pyspark")
+        parent2 = self.tree.AppendMultilineItem(root, "Tell me more about Apache Airflow")
+        
+        # Expand all items
+        self.tree.ExpandAll()
 
-        panel = wx.Panel(self)
-
-        # Create a splitter window
-        splitter = wx.SplitterWindow(panel, style=wx.SP_LIVE_UPDATE)
-
+class LeftPanel(wx.Panel):
+    def __init__(self, parent):
+        super().__init__(parent)
          # Create Notebook
-        left_notebook = wx.Notebook(splitter)
+        left_notebook = wx.Notebook(self)
 
         # Create a panel for the notebook tab and add the ListCtrl to it
         self.list_panel = TranscriptionListPanel(left_notebook)
@@ -1079,6 +1085,26 @@ class MyFrame(wx.Frame):
         
         left_notebook.SetSelection(2)
 
+        self.button = wx.Button(self, label="Populate List")
+        self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(left_notebook, 1, wx.EXPAND)
+        sizer.Add(self.button, 0, wx.ALL, 5)
+        self.SetSizer(sizer)
+    def on_button_click(self, event):
+        pub.sendMessage("test_populate")
+        
+class MyFrame(wx.Frame):
+    def __init__(self,queue, *args, **kw):
+        super(MyFrame, self).__init__(*args, **kw)
+
+        panel = wx.Panel(self)
+
+        # Create a splitter window
+        splitter = wx.SplitterWindow(panel, style=wx.SP_LIVE_UPDATE)
+
+        left_panel = LeftPanel(splitter)
+
        # Right Notebook for TextCtrl
         right_notebook = wx.Notebook(splitter)
 
@@ -1089,9 +1115,10 @@ class MyFrame(wx.Frame):
         self.web_view_panel = Log_WebViewPanel(right_notebook)
         right_notebook.AddPage(self.web_view_panel, "WebView")   
         right_notebook.SetSelection(1)     
+        
 
         # Split the main splitter window vertically between the left and right notebooks
-        splitter.SplitVertically(left_notebook, right_notebook)
+        splitter.SplitVertically(left_panel, right_notebook)
         splitter.SetSashGravity(0.5)  # Set initial split at 50% width for each side
         splitter.SetMinimumPaneSize(400)  # Minimum pane width to prevent collapsing
 
@@ -1170,7 +1197,8 @@ async def main():
     
     queue = asyncio.Queue()
     app = WxAsyncApp()  # Use WxAsyncApp for async compatibility
-    frame = MyFrame(queue, None, title="Queue in wxPython", size=(400, 300))
+    #Resumable Microphone Streaming 
+    frame = MyFrame(queue, None, title="RMS Transcribe for Google Speech", size=(400, 300))
     frame.SetSize((1200, 1000)) 
     frame.Show()
     apc.processor = AsyncProcessor(queue)
