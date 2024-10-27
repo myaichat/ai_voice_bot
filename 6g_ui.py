@@ -1,6 +1,8 @@
 
 
 import wx
+import wx.html2
+import wx.adv
 import sys
 import time
 from itertools import tee
@@ -78,8 +80,8 @@ class TranscriptionListPanel(wx.Panel):
         list_width = self.list_ctrl.GetSize().GetWidth()    
         self.list_ctrl.SetColumnWidth(1, list_width - self.list_ctrl.GetColumnWidth(0) - 20) 
         
-        self.conversation_history = []
-        self.client= openai.OpenAI()
+        #self.conversation_history = []
+        #self.client= openai.OpenAI()
         pub.subscribe(self.on_stream_closed, "stream_closed")  
         pub.subscribe(self.on_ask_model_event, "ask_model")
     def  on_stream_closed(self, data):
@@ -121,8 +123,8 @@ class TranscriptionListPanel(wx.Panel):
         # Display a message box with the clicked row's data
         #print(f"You double-clicked on:\nId: {id_value}\nTranscription: {prompt}")
         pub.sendMessage("set_header", msg=prompt)
-        apc.processor.conversation_history=[]
-        if 1:
+        #apc.processor.conversation_history=[]
+        if 0:
             await apc.processor.run_stream_response(prompt)
 
         else:
@@ -186,21 +188,6 @@ class TranscriptionTextPanel(wx.Panel):
             self.text_ctrl.SetValue('')
         old=self.text_ctrl.GetValue()
         self.text_ctrl.SetValue(old+response)
-import wx.html2
-class _WebViewPanel(wx.Panel):
-    def __init__(self, parent):
-        super(WebViewPanel, self).__init__(parent)
-
-        # Create the WebView control
-        self.web_view = wx.html2.WebView.New(self)
-
-        # Load a default page or URL
-        self.web_view.LoadURL("https://www.example.com")  # Set the URL as needed
-
-        # Layout for the WebView in this panel
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.web_view, 1, wx.EXPAND | wx.ALL, 5)
-        self.SetSizer(sizer)
 
 def _long_running_process():
     """start bidirectional streaming from microphone input to speech API"""
@@ -273,10 +260,10 @@ class AsyncProcessor:
         ch.append({"role": "user", "content": prompt})
         # Create a chat completion request with streaming enabled
         #pp(conversation_history)
-        pp(ch)  
+        #pp(ch)  
         response = client.chat.completions.create(
-            #model="gpt-4o-mini",
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
+            #model="gpt-3.5-turbo",
             messages=ch, 
 
             stream=True
@@ -344,48 +331,6 @@ class AsyncProcessor:
         ch.append({"role": "assistant", "content": ''.join(out)})
             
 
-
-    async def _run_stream_response(self, prompt):
-        #pub.sendMessage("applog", msg='test', type="info")    
-        if 0:
-            self.mock_stream_response(prompt)
-            return None
-        ch, client=self.conversation_history, self.client
-        ch.append({"role": "user", "content": prompt})
-        # Create a chat completion request with streaming enabled
-        #pp(conversation_history)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            #model="gpt-3.5-turbo",
-            messages=ch, 
-
-            stream=True
-        )
-
-        # Print each response chunk as it arrives
-        out=[]
-
-        for chunk in response:
-                  
-            if hasattr(chunk.choices[0].delta, 'content'):
-                content = chunk.choices[0].delta.content
-                if not content:
-                    continue
-
-                print(content, end='', flush=True)
-                await self.queue.put(content)
-                await asyncio.sleep(0)
-                #await asyncio.sleep(0.1)
-                #pub.sendMessage("display_response", response=content)
-                #pub.sendMessage("applog", msg=content, type="partial")
-                
-
-        
-
-        ch.append({"role": "assistant", "content": ''.join(out)})
-        #pub.sendMessage("display_response", response='<br><br>')
-        await self.queue.put('\n\n\n')    
-        return None
 import re
 import markdown2
 from pygments import highlight
@@ -410,7 +355,9 @@ class AppLog_Controller():
             if 1:
                 print(333333, self.page_history)
                 forward=self.page_history.pop()
-                self.page_forward.append(forward)    
+                self.page_forward.append(forward)   
+                self.update_back()
+                self.update_forward() 
             self.load_from_file(self.page_history[-1])              
     def on_page_forward(self):
         print('on_page_forward')
@@ -422,6 +369,13 @@ class AppLog_Controller():
             forward=self.page_forward.pop()
             self.page_history.append(forward)    
             self.load_from_file(forward)
+            self.update_forward()
+            self.update_back()
+    def update_forward(self):
+        if self.page_forward:
+            self.enable_forward()
+        else:
+            self.disable_forward()
     def set_header(self, msg):
         self.history +=self.applog
         self.applog=[]  
@@ -435,6 +389,13 @@ class AppLog_Controller():
         #self.applog.append('<br><br>')
         tmp_file=self.save_html()
         self.page_history.append(tmp_file) 
+        self.update_back()
+
+    def update_back(self):
+        if len(self.page_history)>1:
+            self.enable_back()
+        else:
+            self.disable_back()
         #wx.CallAfter(self.refresh_log_with_history)
     def display_response(self, response):
         #e()
@@ -674,15 +635,73 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
         #self.web_view.Bind(wx.EVT_CONTEXT_MENU, self.on_right_click)
         #self.web_view.Bind(wx.html2.EVT_WEBVIEW_ERROR, self.on_webview_error)
         #self.web_view.Bind(wx.EVT_CONTEXT_MENU, self.show_popup_menu)
-
+        self.create_navigation_panel()
         # Set initial HTML content
         self.set_initial_content()
 
         # Create sizer to organize the WebView
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.web_view, 1, wx.EXPAND, 0)
+        sizer.Add(self.nav_panel, 0, wx.EXPAND | wx.ALL, 0)
         self.SetSizer(sizer)
 
+    def enable_forward(self):
+        self.forward_button.Enable(True)
+        self.forward_button.SetForegroundColour(wx.Colour(0, 0, 255))  # Active blue
+        font = self.forward_button.GetFont()
+        font.SetUnderlined(True)
+        self.forward_button.SetFont(font)          
+    def disable_forward(self):
+        self.forward_button.Enable(False)
+        self.forward_button.Enable(False)  
+        self.forward_button.SetForegroundColour(wx.Colour(150, 150, 150))  # Disabled gray
+        font = self.forward_button.GetFont()
+        font.SetUnderlined(False)
+        self.forward_button.SetFont(font)         
+    def enable_back(self):
+        self.back_button.Enable(True)
+        self.back_button.SetForegroundColour(wx.Colour(0, 0, 255))  # Active blue
+        font = self.back_button.GetFont()
+        font.SetUnderlined(True)
+        self.back_button.SetFont(font)        
+    def disable_back(self):
+        self.back_button.Enable(False)  
+        self.back_button.SetForegroundColour(wx.Colour(150, 150, 150))  # Disabled gray
+        font = self.back_button.GetFont()
+        font.SetUnderlined(False)
+        self.back_button.SetFont(font)                       
+    def create_navigation_panel(self):
+        """Creates the navigation panel with Back and Forward buttons in opposite corners."""
+        self.nav_panel = wx.Panel(self)
+        nav_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.nav_panel.SetBackgroundColour(wx.Colour(255, 255, 255))
+        # Back Button
+        self.back_button = back_button=wx.StaticText(self.nav_panel, label="Back")
+              
+        back_button.Bind(wx.EVT_LEFT_DOWN, self.on_back)
+        nav_sizer.Add(back_button, 0, wx.ALL, 5)
+        font = back_button.GetFont()
+        font.SetUnderlined(True)
+        font.SetPointSize(12)  # Set to desired font size
+        back_button.SetFont(font)           
+        self.back_button.SetForegroundColour(wx.Colour(0, 0, 255))  # Blue for active state
+        self.disable_back()
+     
+
+        # Add a spacer to push the "Forward" button to the far right
+        nav_sizer.AddStretchSpacer(1)
+
+        # Forward Button
+        self.forward_button=forward_button = wx.StaticText(self.nav_panel, label="Forward")
+
+
+        forward_button.Bind(wx.EVT_LEFT_DOWN, self.on_forward)
+        nav_sizer.Add(forward_button, 0, wx.ALL, 5)  # Removed wx.ALIGN_RIGHT
+        font = forward_button.GetFont()
+        font.SetPointSize(12)  # Set to desired font size
+        forward_button.SetFont(font)  
+        self.nav_panel.SetSizer(nav_sizer)
+        self.disable_forward()
 
       
     def on_right_click(self, event):
@@ -740,13 +759,11 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
         """Show a different context menu with 'Back' when no text is selected."""
         menu = wx.Menu()
         back_item = menu.Append(wx.ID_ANY, "Back")
-        if not self.page_history:
-            back_item.Enable(False)        
+        self.update_back()        
         # Bind the menu item to the on_back method
         self.Bind(wx.EVT_MENU, self.on_back, back_item)
         forward_item = menu.Append(wx.ID_ANY, "Forward")
-        if not self.page_forward:
-            forward_item.Enable(False)
+        self.update_forward()
         
         # Bind the menu item to the on_back method
         self.Bind(wx.EVT_MENU, self.on_forward, forward_item)        
@@ -1028,12 +1045,7 @@ class MyFrame(wx.Frame):
                 self.content_buffer = ""  # Clear buffer after update
             await asyncio.sleep(0.2)  # Update every 200ms
 
-    async def on_button_click_2(self, event):
-        # Run the long-running process and the queue consumer
-        #response = self.mock_response()  # Replace with the actual response
-        #print(1111)
-        apc.processor = AsyncProcessor(self.queue)
-        await apc.processor.run_stream_response('Tell me more about oracle')
+
 
    
 
