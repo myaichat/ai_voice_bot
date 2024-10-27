@@ -198,7 +198,7 @@ def _long_running_process():
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=SAMPLE_RATE,
         language_code="en-US",
-        max_alternatives=3,
+        max_alternatives=1,
         model='latest_long',
     )
 
@@ -1050,6 +1050,17 @@ class TranscriptionTreePanel(wx.Panel):
         self.SetSizer(sizer)
         self.Layout()
         pub.subscribe(self.on_test_populate, "test_populate") 
+        pub.subscribe(self.on_stream_closed, "stream_closed")  
+        #pub.subscribe(self.on_ask_model_event, "ask_model")
+      
+    def  on_stream_closed(self, data):
+        transcript, corrected_time, tid=    data
+        #print (7777, tid, transcript, corrected_time, tid)
+        if transcript.strip():
+            parent = self.tree.AppendMultilineItem(self.root, f"{transcript}")
+            self.tree.ExpandAll()
+            self.tree.Refresh()
+
     def on_test_populate(self):
         print('on_test_populate')
         #self.tree.DeleteAllItems()
@@ -1071,6 +1082,7 @@ class TranscriptionHtmlTreePanel(wx.Panel):
         self.tree = MultiLineHtmlTreeCtrl(self)
         # Add root and example items
         self.root = self.tree.AddRoot("Root")
+        parent1 = self.tree.AppendMultilineItem(self.root, "Parent Item 1\nWith multiple lines\nof text")
         if 0:
             # Add multiline items
             parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
@@ -1089,6 +1101,18 @@ class TranscriptionHtmlTreePanel(wx.Panel):
         self.SetSizer(sizer)
         self.Layout()
         pub.subscribe(self.on_test_populate, "test_populate") 
+        pub.subscribe(self.on_stream_closed, "stream_closed")  
+        #pub.subscribe(self.on_ask_model_event, "ask_model")
+      
+    def  on_stream_closed(self, data):
+        transcript, corrected_time, tid=    data
+        #print (7777, tid, transcript, corrected_time, tid)
+        if transcript.strip():
+            parent1 = self.tree.AppendMultilineItem(self.root,
+                                                ["<b>Parent Info 1</b>", "<i>Additional Info</i>"])
+            #self.tree.ExpandAll()
+            #self.tree.Refresh()  
+        self.Layout()      
     def on_test_populate(self):
         print('on_test_populate')
         #self.tree.DeleteAllItems()
@@ -1115,25 +1139,26 @@ class LeftPanel(wx.Panel):
         super().__init__(parent)
          # Create Notebook
         left_notebook = wx.Notebook(self)
-
-        # Create a panel for the notebook tab and add the ListCtrl to it
-        self.list_panel = TranscriptionListPanel(left_notebook)
-        left_notebook.AddPage(self.list_panel, "Transcriptions")
-        self.nav_history = NavigationHistoryHtmlListBox(left_notebook)
-        left_notebook.AddPage(self.nav_history, "History")   
-        long_text = "This is a long text that will wrap into multiple lines in wxHtmlListBox. " \
-            "Each item can contain HTML tags, making it possible to add styling."
-        self.nav_history.add_history_item(long_text)
-
-        self.tree_panel = TranscriptionTreePanel(left_notebook)
-        left_notebook.AddPage(self.tree_panel, "Tree")
+        if 0:
+            # Create a panel for the notebook tab and add the ListCtrl to it
+            self.list_panel = TranscriptionListPanel(left_notebook)
+            left_notebook.AddPage(self.list_panel, "Transcriptions")
+        if 0:
+            self.nav_history = NavigationHistoryHtmlListBox(left_notebook)
+            left_notebook.AddPage(self.nav_history, "History")   
+            long_text = "This is a long text that will wrap into multiple lines in wxHtmlListBox. " \
+                "Each item can contain HTML tags, making it possible to add styling."
+            self.nav_history.add_history_item(long_text)
+        if 0:
+            self.tree_panel = TranscriptionTreePanel(left_notebook)
+            left_notebook.AddPage(self.tree_panel, "Tree")
 
         self.tree_panel = TranscriptionHtmlTreePanel(left_notebook)
         left_notebook.AddPage(self.tree_panel, "HtmlTree")
 
 
         
-        left_notebook.SetSelection(3)
+        #left_notebook.SetSelection(3)
 
         self.button = wx.Button(self, label="Populate List")
         self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
