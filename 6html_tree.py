@@ -4,35 +4,57 @@ import wx.html
 from pubsub import pub
 
 class CustomHtmlListBox(wx.html.HtmlListBox):
-    def __init__(self, parent, items, tree_ctrl, tree_item, id=wx.ID_ANY, size=(200, 80)):
+    def __init__(self, tid, parent, text_item, tree_ctrl, tree_item, id=wx.ID_ANY, size=(200, 80)):
         super(CustomHtmlListBox, self).__init__(parent, id, size=size)
-        self.items = items
+        self.text_item = text_item
+        self.tid=tid
         self.tree_ctrl = tree_ctrl  # Reference to the tree control
         self.tree_item = tree_item  # Reference to the corresponding tree item
-        self.history_items = []
+        self.formatted_item = None
         self.SetItemCount(0)  # Initial item count
         self.Bind(wx.EVT_LEFT_DCLICK, self.on_double_click)
         self.Bind(wx.EVT_LEFT_DOWN, self.on_single_click)
-        self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        #self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        #self.SetBackgroundColour(wx.Colour(211, 211, 211))
         
         # Remove the border by setting a simple style
         self.SetWindowStyleFlag(wx.BORDER_NONE)
         self.Bind(wx.EVT_SET_FOCUS, self.on_focus)
         self.Bind(wx.EVT_KILL_FOCUS, self.on_focus_lost)
         self.single_click_delayed = None
-        self.add_history_item(items)
+        self.add_history_item(text_item)
         self.Bind(wx.EVT_PAINT, self.on_paint) 
-        
+        self.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
+        self.Bind(wx.EVT_SCROLLWIN, self.on_scroll)
+        self.Bind(wx.EVT_SCROLLWIN_THUMBRELEASE, self.on_scroll)
+        self.Bind(wx.EVT_SCROLLWIN_LINEUP, self.on_scroll)
+        self.Bind(wx.EVT_SCROLLWIN_LINEDOWN, self.on_scroll)
+        pub.subscribe(self.on_resize, "panel_resize")
+    def on_resize(self, event): 
+        print('on_resize')
+        self.adjust_size_to_fit_content(self.text_item)       
+    def on_mouse_wheel(self, event):
+        # Do nothing to disable scroll
+        #print('on_mouse_wheel')
+        pass
+    
+    def on_scroll(self, event):
+        # Prevent all scrolling
+        print('on_scroll')
+        pass
+
     def add_history_item(self, item):
         """Add a new history item with multiline text to the HtmlListBox."""
-        pp(item)
+        #pp(item)
 
         #self.history_items.append(formatted_text)
         #self.SetItemCount(len(self.history_items))
-        self.adjust_size_to_fit_content(item)
+        formatted_text=self.adjust_size_to_fit_content(item)
+        self.formatted_item=formatted_text
+        self.SetItemCount(1)
         self.Refresh()
 
-    def adjust_size_to_fit_content(self, item):
+    def adjust_size_to_fit_content(self, text_item):
         """Calculate and adjust the size of the list box based on the content and LeftPanel width, with scroll check."""
         # Get the width of the LeftPanel (parent's parent in this case)
         max_width = self.GetParent().GetSize().width - 75  # Padding to prevent overflow
@@ -40,7 +62,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         # Use a device context to measure the text size
         dc = wx.ClientDC(self)
         dc.SetFont(self.GetFont())
-        text = item[1]
+        text = text_item
 
         # Measure each line of text and wrap if necessary
         lines = text.split("\n")
@@ -92,13 +114,12 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         html_text = text.replace("\n", "<br>")
         formatted_text = f"""<span style="color: #2d2d2d; font-size: 14px; font-family: Arial, sans-serif;"><b>>></b>{html_text}</span>"""        
 
-        self.history_items.append(formatted_text)
-        self.SetItemCount(len(self.history_items))
-        self.Refresh()
+
 
 
         # Update the size of the HtmlListBox
         #self.SetSize((max_width, total_height))
+        return formatted_text
     def on_paint(self, event):
         """Handle paint event to draw scroll indicators if needed."""
         # First call the default paint method
@@ -138,14 +159,15 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         current_scroll_position = self.GetScrollPos(wx.VERTICAL)
         return (total_content_height - current_scroll_position) > visible_height
     def on_focus(self, event):
-        self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        #self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        #self.SetBackgroundColour(wx.Colour(211, 211, 211))
         #self.Refresh()
         event.Skip()
 
     def on_focus_lost(self, event):
         self.SetBackgroundColour(wx.Colour(255, 255, 255))
         #self.Refresh()
-        event.Skip()
+        #event.Skip()
 
     def on_single_click(self, event):
         if self.single_click_delayed:
@@ -153,7 +175,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         # Highlight the corresponding tree item on single click
         print("Single click in HtmlListBox")
         self.tree_ctrl.SelectItem(self.tree_item)
-        self.SetBackgroundColour(wx.Colour(211, 211, 211)) 
+        #self.SetBackgroundColour(wx.Colour(211, 211, 211)) 
         #event.Skip()
         #self.SetBackgroundColour(wx.Colour(255, 255, 255))
         self.single_click_delayed = wx.CallLater(160, self.ProcessSingleClick, self.tree_item, event)        
@@ -162,6 +184,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
             # self.SelectItem(item)
             print("Single click detected on item in tree")
         self.single_click_delayed = None
+        self.SetBackgroundColour(wx.Colour(240, 240, 240)) 
     def on_double_click(self, event):
         if self.single_click_delayed:
             self.single_click_delayed.Stop()
@@ -172,7 +195,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         self.SetBackgroundColour(wx.Colour(255, 255, 255))
         #item_index = self.tree_ctrl.GetIndexOfItem(self.tree_item)  # or define an index if needed
         #if item_index < len(self.history_items):
-        pp( self.history_items[0])        
+        pp( self.formatted_item)        
         #
         #event.Skip()
         print('is_scrollable:', self.is_scrollable())
@@ -185,7 +208,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         dc.SetFont(self.GetFont())
         
         total_content_height = 0
-        for item in self.history_items:
+        for item in [self.formatted_item]:
             # Measure each line accurately, including wrapped lines
             text_lines = item.split("<br>")  # Assuming HTML <br> tags are used for new lines
             for line in text_lines:
@@ -206,8 +229,11 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         return self.is_content_overflowing()        
 
     def OnGetItem(self, index):
-        self.SetBackgroundColour(wx.Colour(255, 255, 255))
-        return f"<div style='padding: 10px; background-color: #ffffff;'>{self.history_items[index]}</div>"
+        if self.tid%2==1:
+            self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        else:
+            self.SetBackgroundColour(wx.Colour(240, 240, 240))
+        return f"<div style='padding: 10px; background-color: #ffffff;'>{self.formatted_item}</div>"
 
 
 
@@ -228,15 +254,85 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
         pub.subscribe(self.OnAddItem, "ADD_ITEM")
         self.root = self.AddRoot("Root")
         pub.subscribe(self.on_stream_closed, "stream_closed")
-    def on_stream_closed(self, data):
-        transcript, corrected_time, tid = data
-        # Ensure UI updates happen in the main thread
-        wx.CallAfter(self.update_tree_with_transcript, transcript)
+        
+        pub.subscribe(self.on_partial_stream, "partial_stream")
 
-    def update_tree_with_transcript(self, transcript):
+        self.tid=0
+        self.html_items={}
+
+    def on_partial_stream(self, data):  
+        transcript, corrected_time, tid, rid = data
+        #print('on_partial_stream')
+        #print(transcript, corrected_time, tid, rid)
         if transcript.strip():
-            parent1 = self.AppendMultilineItem(self.root, 
-                                            ["<b>Transcript</b>", f"<i>{transcript}</i>"])
+            item_id=f'{tid}:{rid}'
+            #self.html_items[tid]=transcript
+            if item_id in self.html_items:
+                
+                wx.CallAfter( self.update_tree_with_transcript,item_id, f'{item_id}, {transcript}')
+            else:
+                
+                wx.CallAfter(self.append_tree_with_transcript,item_id, f'{item_id}, {transcript}')       
+            # Ensure UI updates happen in the main thread
+            #wx.CallAfter(self.update_tree_with_transcript, transcript)
+
+    def on_stream_closed(self, data):
+        transcript, corrected_time, tid, rid = data
+        if transcript.strip():  # Ensure there's content in the transcript
+            print('|'*80)
+            pp(transcript)
+            print('|'*80)
+            item_id = f'{tid}:{rid}'
+            wx.CallAfter(self.recreate_html_item,item_id, transcript)
+    def recreate_html_item(self, item_id, transcript):
+        # Check if the item exists
+        if item_id in self.html_items:
+            # Get the tree item and the existing HtmlListBox
+            tree_item = self.html_items[item_id].tree_item
+            old_html_item = self.html_items[item_id]
+            
+            # Remove the old control from the tree item
+            self.DeleteItemWindow(tree_item)
+            
+            # Explicitly delete the old HtmlListBox to free up resources
+            #old_html_item.Destroy()
+            
+            # Create a new HtmlListBox with the final transcription
+            new_html_item = CustomHtmlListBox(self.tid, self, transcript, self, tree_item, size=(200, 80))
+            self.html_items[item_id] = new_html_item  # Replace the old reference with the new one
+            
+            # Attach the new HtmlListBox to the tree item
+            self.SetItemWindow(tree_item, new_html_item)
+            if 0:
+                # Adjust layout to reflect the changes
+                new_html_item.adjust_size_to_fit_content(transcript)
+                self.Layout()
+                
+                # Optionally expand/collapse to force a refresh if needed
+                self.Collapse(tree_item)
+                self.Expand(tree_item)
+
+    def _on_stream_closed(self, data):
+        transcript, corrected_time, tid, rid = data
+        if transcript.strip():  
+            item_id=f'{tid}:{rid}'
+            #self.html_items[tid]=transcript
+            if item_id in self.html_items:
+                
+                wx.CallAfter( self.update_tree_with_transcript,item_id, f'{item_id}, {transcript}')
+            else:
+                wx.CallAfter(self.append_tree_with_transcript,item_id, f'{item_id}, {transcript}')  
+
+    def append_tree_with_transcript(self, item_id, transcript):
+        #print('append_tree_with_transcript')
+        if transcript.strip():
+            parent1 = self.AppendMultilineItem(item_id, self.root, transcript)
+            self.ExpandAll()  # Expanding within the main thread  
+
+    def update_tree_with_transcript(self,item_id, transcript):
+        #print('update_tree_with_transcript')
+        if transcript.strip():
+            parent1 = self.UpdateMultilineItem(item_id, self.root, transcript)
             self.ExpandAll()  # Expanding within the main thread       
 
         
@@ -280,14 +376,42 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
         # Assign the image list to the tree control
         self.SetButtonsImageList(image_list)
 
-    def AppendMultilineItem(self, parent, html_items, data=None):
+    def UpdateMultilineItem(self, item_id, parent, text_item, data=None):
+        assert item_id in self.html_items, f"Item ID {item_id} not found in html_items"
+        
+        # Access the HtmlListBox for the specific item
+        html_item = self.html_items[item_id]
+        
+        # Add the new content and adjust the size accordingly
+        html_item.add_history_item(text_item)
+        
+        # Adjust the size to fit new content
+        html_item.adjust_size_to_fit_content(text_item)
+        html_item.Update()  # Refresh the HtmlListBox
+        if 0:
+            
+            # Invalidate the best size and trigger layout recalculation for the tree control
+            self.InvalidateBestSize()
+            self.Layout()
+            
+            # Optionally collapse and expand the specific item if necessary to force a refresh
+            self.Collapse(html_item.tree_item)
+            self.Expand(html_item.tree_item)
+            
+            # Expand all to ensure visibility for the updated item, if needed
+            self.ExpandAll()              
+
+    
+    def AppendMultilineItem(self, item_id, parent, text_item, data=None):
         # Append an item with an empty string as the text
         item = self.AppendItem(parent, "")
         if data is not None:
             self.SetItemData(item, data)
-
+        self.tid += 1
         # Create an instance of CustomHtmlListBox with specific items, passing tree control and item references
-        html_list_box = CustomHtmlListBox(self, html_items, self, item, size=(200, 80))
+        assert item_id not in self.html_items, (item_id, text_item)
+        self.html_items[item_id]=html_list_box = CustomHtmlListBox(self.tid,self, text_item, self, item,  size=(200, 180))
+        #html_list_box.Enable(False)
         self.SetItemWindow(item, html_list_box)
         
         # Add sample history items to the HtmlListBox
@@ -344,6 +468,14 @@ class LeftPanel(wx.Panel):
         sizer.Add(left_notebook, 1, wx.EXPAND)
         sizer.Add(self.button, 0, wx.ALL, 5)
         self.SetSizer(sizer)
+        self.Bind(wx.EVT_SIZE, self.on_panel_resize)
+
+    def on_panel_resize(self, event):
+        #print('on_panel_resize')
+        # Force the HtmlListBox to recalculate sizes on panel resize
+        #self.html_list_box.Refresh()
+        pub.sendMessage("panel_resize", event=None)
+        event.Skip()        
        
     def on_button_click(self, event):
         pub.sendMessage("test_populate")
@@ -390,9 +522,10 @@ def _long_running_process():
     sys.stdout.write('\nListening, say "Quit" or "Exit" to stop.\n\n')
     sys.stdout.write("End (ms)       Transcript Results/Status\n")
     sys.stdout.write("=====================================================\n")
-
+    rid=0
     with mic_manager as stream:
         while not stream.closed:
+
             sys.stdout.write(YELLOW)
             sys.stdout.write(
                 "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
@@ -411,7 +544,7 @@ def _long_running_process():
             responses = client.streaming_recognize(streaming_config, requests)
 
             # Now, put the transcription responses to use.
-            listen_print_loop(responses, stream)
+            listen_print_loop(rid,responses, stream)
 
             if stream.result_end_time > 0:
                 stream.final_request_end_time = stream.is_final_end_time
@@ -424,7 +557,8 @@ def _long_running_process():
             if not stream.last_transcript_was_final:
                 sys.stdout.write("\n")
             stream.new_stream = True
-            print("NEW STREAM")
+            
+            rid += 1
 
 import threading
 class ExampleFrame(wx.Frame):
