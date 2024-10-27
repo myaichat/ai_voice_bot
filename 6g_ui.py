@@ -65,10 +65,12 @@ class TranscriptionListPanel(wx.Panel):
 
         # Create the ListCtrl within this panel
         self.list_ctrl = TranscriptionListCtrl(self)
-
+        self.button = wx.Button(self, label='Populate List')
+        self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
         # Layout for the ListCtrl in this panel
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 5)
+        sizer.Add(self.button, 0, wx.EXPAND | wx.ALL, 5)
         self.SetSizer(sizer)
         self.Bind(wx.EVT_SIZE, self.on_resize)
         
@@ -84,6 +86,9 @@ class TranscriptionListPanel(wx.Panel):
         #self.client= openai.OpenAI()
         pub.subscribe(self.on_stream_closed, "stream_closed")  
         pub.subscribe(self.on_ask_model_event, "ask_model")
+    def on_button_click(self, event):
+        #pub.sendMessage("applog", msg="Button clicked", type="info")
+        self.test()        
     def  on_stream_closed(self, data):
         transcript, corrected_time, tid=    data
         #print (7777, tid, transcript, corrected_time, tid)
@@ -615,6 +620,7 @@ class EditTextDialog(wx.Dialog):
         sizer.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 10)
         sizer.Add(button_sizer, 0, wx.ALIGN_CENTER)
         self.SetSizer(sizer)
+        self.CenterOnParent()
 
     def GetEditedText(self):
         return self.text_ctrl.GetValue()    
@@ -702,6 +708,11 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
         forward_button.SetFont(font)  
         self.nav_panel.SetSizer(nav_sizer)
         self.disable_forward()
+        # Add padding to the top to remove the visible line
+        #self.nav_panel.SetMinSize((-1, 25))  # Adjust height to fit the links with some padding
+
+        # Optionally remove the border from WebView too
+        self.web_view.SetWindowStyle(wx.NO_BORDER)        
 
       
     def on_right_click(self, event):
@@ -969,7 +980,53 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
 
     def on_webview_error(self, event):
         print(f"WebView error: {event.GetString()}")
+import wx
+import wx.html 
+class NavigationHistoryHtmlListBox(wx.html.HtmlListBox):
+    def __init__(self, parent):
+        super().__init__(parent)
+        
+        # List to store HTML-formatted history items
+        self.history_items = []
+        self.SetItemCount(0)  # Initial item count
+        self.Bind(wx.EVT_LEFT_DCLICK, self.on_double_click)
+    def on_double_click(self, event):
+        """Handle double-click on a list item."""
+        # Get the position of the mouse click
+        x, y = event.GetPosition()
+        
+        # Determine the item index at the clicked position
+        item_index = self.HitTest(wx.Point(x, y))
+        
+        if item_index != wx.NOT_FOUND:
+            # Fetch the item content (for demonstration)
+            item_content = self.history_items[item_index]
+            wx.MessageBox(f"{item_index}: You double-clicked on:\n\n{item_content}", "Item Double-Clicked")
+        else:
+            # No item found at this position
+            wx.MessageBox("No item found at the clicked position.", "Info")
+    def OnGetItem(self, index):
+        """Return the HTML content for a given item index."""
+        return f"<div style='padding: 10px;'>{self.history_items[index]}</div>"
 
+    def add_history_item(self, text):
+        """Add a new history item with multiline text to the HtmlListBox."""
+        
+        # Format the text to use <br> for line breaks
+        html_text = text.replace("\n", "<br>")
+        
+        # Optional: Customize appearance with HTML and CSS
+        formatted_text = f"""
+            <b>History Item {len(self.history_items) + 1}</b><br>
+            <span style="color: #2d2d2d; font-size: 14px; font-family: Arial, sans-serif;">
+                {html_text}
+            </span>
+        """
+        
+        # Add formatted text to the list and update the control
+        self.history_items.append(formatted_text)
+        self.SetItemCount(len(self.history_items))
+        self.Refresh()       
 class MyFrame(wx.Frame):
     def __init__(self,queue, *args, **kw):
         super(MyFrame, self).__init__(*args, **kw)
@@ -985,7 +1042,12 @@ class MyFrame(wx.Frame):
         # Create a panel for the notebook tab and add the ListCtrl to it
         self.list_panel = TranscriptionListPanel(left_notebook)
         left_notebook.AddPage(self.list_panel, "Transcriptions")
-
+        self.nav_history = NavigationHistoryHtmlListBox(left_notebook)
+        left_notebook.AddPage(self.nav_history, "History")   
+        long_text = "This is a long text that will wrap into multiple lines in wxHtmlListBox. " \
+            "Each item can contain HTML tags, making it possible to add styling."
+        self.nav_history.add_history_item(long_text)
+        left_notebook.SetSelection(1)
 
        # Right Notebook for TextCtrl
         right_notebook = wx.Notebook(splitter)
@@ -1004,15 +1066,14 @@ class MyFrame(wx.Frame):
         splitter.SetMinimumPaneSize(400)  # Minimum pane width to prevent collapsing
 
         # Create button
-        self.button = wx.Button(panel, label='Populate List')
-        self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
+
         self.queue = queue
         #self.abutton = wx.Button(panel, label='Async')
         #AsyncBind(wx.EVT_BUTTON, self.on_button_click_2, self.abutton)
         # Layout
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(splitter, 1, wx.EXPAND)
-        sizer.Add(self.button, 0, wx.CENTER | wx.ALL, 5)
+        #sizer.Add(self.button, 0, wx.CENTER | wx.ALL, 5)
         #sizer.Add(self.abutton, 0, wx.CENTER | wx.ALL, 5)
         panel.SetSizer(sizer)
         self.content_buffer = ""  # Buffer to store content before updating WebView
@@ -1064,9 +1125,7 @@ class MyFrame(wx.Frame):
         # Enable the button when the long-running task is done
         self.button.Enable()
 
-    def on_button_click(self, event):
-        #pub.sendMessage("applog", msg="Button clicked", type="info")
-        self.list_panel.test()
+
 import wxasync
 import asyncio
 class MyApp(wxasync.WxAsyncApp):
