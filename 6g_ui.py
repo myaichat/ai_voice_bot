@@ -1026,7 +1026,33 @@ class NavigationHistoryHtmlListBox(wx.html.HtmlListBox):
         # Add formatted text to the list and update the control
         self.history_items.append(formatted_text)
         self.SetItemCount(len(self.history_items))
-        self.Refresh()       
+        self.Refresh()   
+
+from ai_voice_bot.include.MultiLineTreeCtrl import MultiLineTreeCtrl
+class TranscriptionTreePanel(wx.Panel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.tree = MultiLineTreeCtrl(self)
+        # Add root and example items
+        root = self.tree.AddRoot("Root")
+        
+        # Add multiline items
+        parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
+        child1 = self.tree.AppendMultilineItem(parent1, "This is a child item\nwith two lines")
+        child2 = self.tree.AppendMultilineItem(parent1, "Another child Another child Another child Another child Another child Another child Another child Another child Another child\nwith even more\nlines of text\nto display")
+        child3 = self.tree.AppendMultilineItem(child2, "Another child\nwith even more\nlines of text\nto display")
+        parent2 = self.tree.AppendMultilineItem(root, "Parent Item 2\nAlso multiline")
+        
+        # Expand all items
+        self.tree.ExpandAll()
+        
+        # Layout the frame
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.tree, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+        self.Layout()
+     
 class MyFrame(wx.Frame):
     def __init__(self,queue, *args, **kw):
         super(MyFrame, self).__init__(*args, **kw)
@@ -1047,7 +1073,11 @@ class MyFrame(wx.Frame):
         long_text = "This is a long text that will wrap into multiple lines in wxHtmlListBox. " \
             "Each item can contain HTML tags, making it possible to add styling."
         self.nav_history.add_history_item(long_text)
-        left_notebook.SetSelection(1)
+
+        self.tree_panel = TranscriptionTreePanel(left_notebook)
+        left_notebook.AddPage(self.tree_panel, "Tree")
+        
+        left_notebook.SetSelection(2)
 
        # Right Notebook for TextCtrl
         right_notebook = wx.Notebook(splitter)

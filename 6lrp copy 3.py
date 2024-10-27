@@ -25,7 +25,14 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
     def AppendMultilineItem(self, parent, text, data=None):
         # Append item without checkbox
         item = self.AppendItem(parent, text)
-            
+        
+        # Create a button and attach it to the tree item as a window
+        button = wx.Button(self, label="Button")
+        self.SetItemWindow(item, button)
+        
+        # Bind single-click button event and embed the item text directly
+        button.Bind(wx.EVT_BUTTON, lambda event: self.OnButtonClicked(event, text))
+        
         if data is not None:
             self.SetItemData(item, data)
             
@@ -43,20 +50,20 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
         # Get the item and the flags at the position of the click
         pos = event.GetPosition()
         item, flags = self.HitTest(pos)
-        print (f"OnSingleClick: item: {item}, flags: {flags}")
+        
         # Check if the click was on the expand/collapse button, if so, skip single-click action
         if flags & CT.TREE_HITTEST_ONITEMBUTTON:
             event.Skip()  # Allow the tree to handle the expand/collapse
             return
 
         # Set a delayed call for single-click, allowing for a double-click check
-        self.single_click_delayed = wx.CallLater(160, self.ProcessSingleClick, item, event)
+        self.single_click_delayed = wx.CallLater(200, self.ProcessSingleClick, event)
 
-    def ProcessSingleClick(self, item, event):
+    def ProcessSingleClick(self, event):
         # Get the item at the position of the single click
         pos = event.GetPosition()
-        item1, flags = self.HitTest(pos)
-        print (f"ProcessSingleClick: item: {item}, flags: {flags}")
+        item, flags = self.HitTest(pos)
+        
         if item:
             # Ensure the item is highlighted (selected)
             self.SelectItem(item)
@@ -67,18 +74,15 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
             # Check if the window is a button or simply log the item text
             item_text = self.GetItemText(item)
             if isinstance(window, wx.Button):
-                #wx.MessageBox(f"Single click detected on button of item '{item_text}'")
-                print (f"Single click detected on BUTTON of item '{item_text}'")
+                wx.MessageBox(f"Single click detected on button of item '{item_text}'")
             else:
-                #wx.MessageBox(f"Single click detected on item '{item_text}' without button")
-                print (f"Single click detected on item '{item_text}' without button")
+                wx.MessageBox(f"Single click detected on item '{item_text}' without button")
         
         # Clear the delayed call reference
         self.single_click_delayed = None
 
     def OnDoubleClick(self, event):
         # Cancel the single-click action if double-click detected
-        print("OnDoubleClick")
         if self.single_click_delayed:
             self.single_click_delayed.Stop()
             self.single_click_delayed = None
@@ -86,7 +90,7 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
         # Get the item at the position of the double-click
         pos = event.GetPosition()
         item, flags = self.HitTest(pos)
-        print (f"OnDoubleClick: item: {item}, flags: {flags}")
+        
         if item:
             # Ensure the item is highlighted (selected)
             self.SelectItem(item)
@@ -101,11 +105,7 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
             # Check if the window is a button
             if isinstance(window, wx.Button):
                 item_text = self.GetItemText(item)
-                #wx.MessageBox(f"Button double-clicked on item '{item_text}'")
-                print (f"Button double-clicked on item '{item_text}'")  
-            else:
-                item_text = self.GetItemText(item)
-                print (f"Double-clicked on item '{item_text}' without button")
+                wx.MessageBox(f"Button double-clicked on item '{item_text}'")
         
         # Skip the event to allow other handlers to process it
         event.Skip()
@@ -133,7 +133,7 @@ class ExampleFrame(wx.Frame):
         parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
         child1 = self.tree.AppendMultilineItem(parent1, "This is a child item\nwith two lines")
         child2 = self.tree.AppendMultilineItem(parent1, "Another child\nwith even more\nlines of text\nto display")
-        child3 = self.tree.AppendMultilineItem(child2, "Another child\nwith even more\nlines of text\nto display")
+        
         parent2 = self.tree.AppendMultilineItem(root, "Parent Item 2\nAlso multiline")
         
         # Expand all items

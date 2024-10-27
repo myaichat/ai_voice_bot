@@ -1,7 +1,7 @@
 import wx
 import wx.lib.agw.customtreectrl as CT
 
-class MultilineTreeCtrl(CT.CustomTreeCtrl):
+class MultiLineTreeCtrl(CT.CustomTreeCtrl):
     def __init__(self, parent, id=wx.ID_ANY, pos=wx.DefaultPosition,
                  size=wx.DefaultSize):
         # Create the base style with required flags
@@ -11,7 +11,7 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
                    CT.TR_FULL_ROW_HIGHLIGHT)         # Highlight full row on selection
         
         # Initialize with explicit agwStyle
-        super(MultilineTreeCtrl, self).__init__(parent, id, pos, size, 
+        super(MultiLineTreeCtrl, self).__init__(parent, id, pos, size, 
                                                agwStyle=agwStyle,
                                                style=wx.WANTS_CHARS)
         
@@ -25,7 +25,14 @@ class MultilineTreeCtrl(CT.CustomTreeCtrl):
     def AppendMultilineItem(self, parent, text, data=None):
         # Append item without checkbox
         item = self.AppendItem(parent, text)
+        if 0:
+            # Create a button and attach it to the tree item as a window
+            button = wx.Button(self, label="Button")
+            self.SetItemWindow(item, button)
             
+            # Bind single-click button event and embed the item text directly
+            button.Bind(wx.EVT_BUTTON, lambda event: self.OnButtonClicked(event, text))
+        
         if data is not None:
             self.SetItemData(item, data)
             

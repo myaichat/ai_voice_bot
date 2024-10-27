@@ -57,7 +57,11 @@ class ResumableMicrophoneMultiStream:
         self.start_time['gen_2'] = get_current_time()
         self.restart_counter = 0
         self.audio_input = []
-        self.last_audio_input = []
+        #self.last_audio_input = []
+        self.last_audio_input={}
+        self.last_audio_input['gen_1'] = []
+        self.last_audio_input['gen_2'] = [] 
+
         #self.result_end_time = 0
         self.result_end_time={}
         self.result_end_time['gen_1'] = 0
