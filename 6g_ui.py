@@ -1064,7 +1064,52 @@ class TranscriptionTreePanel(wx.Panel):
         
         # Expand all items
         self.tree.ExpandAll()
-
+from ai_voice_bot.include.MultiLineHtmlTreeCtrl import MultiLineHtmlTreeCtrl
+class TranscriptionHtmlTreePanel(wx.Panel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.tree = MultiLineHtmlTreeCtrl(self)
+        # Add root and example items
+        self.root = self.tree.AddRoot("Root")
+        if 0:
+            # Add multiline items
+            parent1 = self.tree.AppendMultilineItem(root, "Parent Item 1\nWith multiple lines\nof text")
+            child1 = self.tree.AppendMultilineItem(parent1, "This is a child item\nwith two lines")
+            child2 = self.tree.AppendMultilineItem(parent1, "Another child Another child Another child Another child Another child Another child Another child Another child Another child\nwith even more\nlines of text\nto display")
+            child3 = self.tree.AppendMultilineItem(child2, "Another child\nwith even more\nlines of text\nto display")
+            parent2 = self.tree.AppendMultilineItem(root, "Parent Item 2\nAlso multiline")
+            
+            # Expand all items
+            self.tree.ExpandAll()
+        
+        # Layout the frame
+        
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.tree, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+        self.Layout()
+        pub.subscribe(self.on_test_populate, "test_populate") 
+    def on_test_populate(self):
+        print('on_test_populate')
+        #self.tree.DeleteAllItems()
+        root = self.root
+        
+        # Add multiline items
+        
+        # Add parent and child items with unique HTML content for each HtmlListBox
+        parent1 = self.tree.AppendMultilineItem(root,
+                                                ["<b>Parent Info 1</b>", "<i>Additional Info</i>"])
+        child1 = self.tree.AppendMultilineItem(parent1,
+                                               ["<b>Child Info 1</b>", "<i>Extra Info</i>"])
+        child2 = self.tree.AppendMultilineItem(parent1,
+                                               ["<b>Child Info 2</b>", "<i>Extra Details</i>"])
+       
+        
+        # Expand all items
+        self.tree.ExpandAll()
+    def OnSize(self, event):
+        self.Layout()
+        event.Skip()        
 class LeftPanel(wx.Panel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -1082,8 +1127,13 @@ class LeftPanel(wx.Panel):
 
         self.tree_panel = TranscriptionTreePanel(left_notebook)
         left_notebook.AddPage(self.tree_panel, "Tree")
+
+        self.tree_panel = TranscriptionHtmlTreePanel(left_notebook)
+        left_notebook.AddPage(self.tree_panel, "HtmlTree")
+
+
         
-        left_notebook.SetSelection(2)
+        left_notebook.SetSelection(3)
 
         self.button = wx.Button(self, label="Populate List")
         self.button.Bind(wx.EVT_BUTTON, self.on_button_click)
