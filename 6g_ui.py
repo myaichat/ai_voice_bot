@@ -81,6 +81,7 @@ class TranscriptionListPanel(wx.Panel):
         self.conversation_history = []
         self.client= openai.OpenAI()
         pub.subscribe(self.on_stream_closed, "stream_closed")  
+        pub.subscribe(self.on_ask_model_event, "ask_model")
     def  on_stream_closed(self, data):
         transcript, corrected_time, tid=    data
         #print (7777, tid, transcript, corrected_time, tid)
@@ -111,26 +112,37 @@ class TranscriptionListPanel(wx.Panel):
         index = event.GetIndex()
         id_value = self.list_ctrl.GetItemText(index, 0)
         transcription_value = self.list_ctrl.GetItemText(index, 1)
-        
+        await self.ask_model(transcription_value) 
+    def on_ask_model_event(self, prompt):
+        """Await the async ask_model function directly."""
+        asyncio.create_task(self.ask_model(prompt))
+    async  def ask_model(self, prompt):
+        print(8888, 'ask_model', prompt)
         # Display a message box with the clicked row's data
-        print(f"You double-clicked on:\nId: {id_value}\nTranscription: {transcription_value}")
-        pub.sendMessage("set_header", msg=transcription_value)
-        await apc.processor.run_stream_response(transcription_value)
-        #self.stream_response(transcription_value)  
+        #print(f"You double-clicked on:\nId: {id_value}\nTranscription: {prompt}")
+        pub.sendMessage("set_header", msg=prompt)
+        apc.processor.conversation_history=[]
+        if 1:
+            await apc.processor.run_stream_response(prompt)
 
-    def mock_stream_response(self, prompt):
+        else:
+            await self.mock_stream_response(prompt)              
+
+    async def mock_stream_response(self, prompt):
         """Mock streaming response for testing."""
+        print(9999, 'mock_stream_response', prompt)
         responses = [
-            f'{prompt}\n',
-            "This is the second response.\n",
-            "This is the third response.\n",
-            "This is the fourth response.\n",
-            "This is the fifth response.\n",
+            f'{prompt}<br>',
+            "This is the second response.<br>",
+            "This is the third response.<br>",
+            "This is the fourth response.<br>",
+            "This is the fifth response.<br>",
         ]
 
         for response in responses:
-            pub.sendMessage("display_response", response=response)
-            time.sleep(1)
+            #pub.sendMessage("display_response", response=response)
+            await apc.processor.queue.put(response)
+            await asyncio.sleep(0.1)   
         pub.sendMessage("done_display", response=())
 
     def stream_response(self, prompt):
@@ -257,12 +269,14 @@ class AsyncProcessor:
     async def run_stream_response(self, prompt):
        
         ch, client=self.conversation_history, self.client
-        ch=[]
+        #ch=[]
         ch.append({"role": "user", "content": prompt})
         # Create a chat completion request with streaming enabled
         #pp(conversation_history)
+        pp(ch)  
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            #model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=ch, 
 
             stream=True
@@ -286,7 +300,8 @@ class AsyncProcessor:
                     continue
                 #print(content, end='', flush=True)
                 await self.queue.put(content)
-                await asyncio.sleep(0)                  
+                await asyncio.sleep(0)   
+                out.append(content)               
                 while i < len(content):
                     if content[i:i+2] == '**':
                         if inside_stars:
@@ -325,7 +340,8 @@ class AsyncProcessor:
             
             if inside_backticks:  # If we're still inside a code block, add the reset code
                 out.append(Style.RESET_ALL)
-            ch.append({"role": "assistant", "content": ''.join(out)})
+        pub.sendMessage("done_display", response=())
+        ch.append({"role": "assistant", "content": ''.join(out)})
             
 
 
@@ -380,21 +396,46 @@ class AppLog_Controller():
         self.set_log()
         self.header='App Log'
         self.history=[]
+        self.page_history=[]
+        self.page_forward=[]
         #pub.subscribe(self.on_log, "applog")
         pub.subscribe(self.done_display, "done_display")
         pub.subscribe(self.display_response, "display_response")
         pub.subscribe(self.set_header, "set_header")
+        pub.subscribe(self.on_page_back, "back")
+        pub.subscribe(self.on_page_forward, "forward")  
+    def on_page_back(self):
+        if self.page_history:
+
+            if 1:
+                print(333333, self.page_history)
+                forward=self.page_history.pop()
+                self.page_forward.append(forward)    
+            self.load_from_file(self.page_history[-1])              
+    def on_page_forward(self):
+        print('on_page_forward')
+        if self.page_forward:
+            print(333333, 'on_page_forward', self.page_forward)
+
+
+           
+            forward=self.page_forward.pop()
+            self.page_history.append(forward)    
+            self.load_from_file(forward)
     def set_header(self, msg):
         self.history +=self.applog
         self.applog=[]  
-         
+                
         self.applog.append({'text':msg,'type':'header'})
         self.applog.append({'text':'','type':'info'})
         self.replace_header(msg)
+  
     def done_display(self, response):
-        
-        self.applog.append('<br><br>')
-        wx.CallAfter(self.refresh_log_with_history)
+        print(333333, 'done_display')
+        #self.applog.append('<br><br>')
+        tmp_file=self.save_html()
+        self.page_history.append(tmp_file) 
+        #wx.CallAfter(self.refresh_log_with_history)
     def display_response(self, response):
         #e()
         if not self.applog:
@@ -592,6 +633,31 @@ class CustomSchemeHandler_Log(wx.html2.WebViewHandler):
             elif request.GetURL() == "app:url_test":
                 wx.CallAfter(self.web_view_panel.on_url_test)
         return None        
+class EditTextDialog(wx.Dialog):
+    """Custom dialog with a multi-line text control for editing text."""
+    def __init__(self, parent, title, initial_text):
+        super().__init__(parent, title=title, size=(400, 300))
+        
+        # Multi-line text control
+        self.text_ctrl = wx.TextCtrl(self, value=initial_text, style=wx.TE_MULTILINE | wx.TE_WORDWRAP)
+        
+        # OK and Cancel buttons
+        ok_button = wx.Button(self, wx.ID_OK, label="OK")
+        cancel_button = wx.Button(self, wx.ID_CANCEL, label="Cancel")
+        
+        # Layout
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button_sizer.Add(ok_button, 0, wx.ALL, 5)
+        button_sizer.Add(cancel_button, 0, wx.ALL, 5)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.text_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+        sizer.Add(button_sizer, 0, wx.ALIGN_CENTER)
+        self.SetSizer(sizer)
+
+    def GetEditedText(self):
+        return self.text_ctrl.GetValue()    
+from urllib.parse import unquote
 class Log_WebViewPanel(wx.Panel,AppLog_Controller):
     def __init__(self, parent):
         super().__init__(parent)
@@ -605,7 +671,9 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
 
         # Bind navigation and error events
         self.web_view.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.on_navigating)
+        #self.web_view.Bind(wx.EVT_CONTEXT_MENU, self.on_right_click)
         #self.web_view.Bind(wx.html2.EVT_WEBVIEW_ERROR, self.on_webview_error)
+        #self.web_view.Bind(wx.EVT_CONTEXT_MENU, self.show_popup_menu)
 
         # Set initial HTML content
         self.set_initial_content()
@@ -615,9 +683,101 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
         sizer.Add(self.web_view, 1, wx.EXPAND, 0)
         self.SetSizer(sizer)
 
+
+      
+    def on_right_click(self, event):
+        # Display the context menu only when there's selected text
+        selected_text = self.get_selected_text()
+        if selected_text:
+            self.show_context_menu()
+
+    def show_context_menu(self):
+        # Create a custom context menu
+        menu = wx.Menu()
+        ask_model_item = menu.Append(wx.ID_ANY, "Ask Model")
+        
+        # Bind the menu item to an action
+        self.Bind(wx.EVT_MENU, self.on_ask_model, ask_model_item)
+        
+        # Show the context menu at the cursor position
+        self.PopupMenu(menu)
+        menu.Destroy()
+    def on_ask_model(self, event):
+        # Use the selected text (stored when intercepted by on_navigating)
+        selected_text = getattr(self, 'selected_text', "No text selected")
+        
+        # Check if Ctrl key is pressed
+        if wx.GetKeyState(wx.WXK_CONTROL):
+            # Show an editable dialog if Ctrl is pressed
+            dialog = EditTextDialog(self, "Edit Selection", selected_text)
+            if dialog.ShowModal() == wx.ID_OK:
+                edited_text = dialog.GetEditedText()
+                print(f"Edited text: {edited_text}")
+                pub.sendMessage("ask_model", prompt=edited_text)
+                # Here you can handle the edited text (e.g., pass it to the model)
+            dialog.Destroy()
+        else:
+            # Default behavior when Ctrl is not pressed
+            print(f"Selected text for model: {selected_text}")
+            # Pass selected_text to your model for inference
+            pub.sendMessage("ask_model", prompt=selected_text)
+
+
+    def on_navigating(self, event):
+        url = event.GetURL()
+        if url.startswith("app://selection"):
+            # Extract selected text from URL
+            selected_text = url.split("text=")[-1]
+            #pp(selected_text)
+            self.selected_text = unquote(selected_text)  # Decode URL encoding
+            #print(f"\n\n\n\tSelected text: {selected_text}")  # Handle the selected text as needed
+            event.Veto()  # Prevent actual navigation for our custom scheme
+            self.show_context_menu()
+        elif url == "app://show_back_menu":
+            event.Veto()  # Prevent navigation
+            self.show_back_menu()   
+    def show_back_menu(self):
+        """Show a different context menu with 'Back' when no text is selected."""
+        menu = wx.Menu()
+        back_item = menu.Append(wx.ID_ANY, "Back")
+        if not self.page_history:
+            back_item.Enable(False)        
+        # Bind the menu item to the on_back method
+        self.Bind(wx.EVT_MENU, self.on_back, back_item)
+        forward_item = menu.Append(wx.ID_ANY, "Forward")
+        if not self.page_forward:
+            forward_item.Enable(False)
+        
+        # Bind the menu item to the on_back method
+        self.Bind(wx.EVT_MENU, self.on_forward, forward_item)        
+        # Show the context menu at the cursor position
+        self.PopupMenu(menu)
+        menu.Destroy()  
+    def on_back(self, event):
+       
+        print ("back")
+        """Handle the 'Back' action to navigate back in the WebView."""
+        pub.sendMessage("back") 
+    def on_forward(self, event):
+        print ("forward")
+        """Handle the 'Back' action to navigate back in the WebView."""
+        pub.sendMessage("forward")                                    
     def attach_custom_scheme_handler(self):
         handler = CustomSchemeHandler_Log(self)
         self.web_view.RegisterHandler(handler)
+        
+    def save_html(self, html_source=None):
+        import tempfile
+        if not html_source:
+            html_source= self.web_view.GetPageSource()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp_file:
+            tmp_file.write(html_source.encode('utf-8'))
+            tmp_file_path = tmp_file.name
+        return tmp_file_path
+        # Load the HTML content from the temporary file to preserve navigation history
+    def load_from_file(self, tmp_file_path):
+
+        self.web_view.LoadURL(f"file://{tmp_file_path}")        
     def set_initial_content(self):
         initial_html = """
         <html>
@@ -676,11 +836,36 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
                     const logCell = document.getElementById('log-cell');
                     logCell.innerHTML = content;
                 }
+                // Listen for mouseup events to detect selection
+                document.addEventListener('mouseup', function() {
+                    var selectedText = window.getSelection().toString();
+                    if (selectedText) {
+                        // Send the selected text to Python via custom scheme
+                        window.location.href = 'app://selection?text=' + encodeURIComponent(selectedText);
+                    }
+                });      
+                // Detect right-click and check if text is selected
+                document.addEventListener('contextmenu', function(event) {
+                    var selectedText = window.getSelection().toString();
+                    if (selectedText) {
+                        // Send the selected text to Python via custom scheme
+                        event.preventDefault();  // Prevent the default context menu
+                        window.location.href = 'app://selection?text=' + encodeURIComponent(selectedText);
+                    } else {
+                        // Send a different URL to Python to indicate no selection
+                        event.preventDefault();
+                        window.location.href = 'app://show_back_menu';
+                    }
+                });                          
             </script>
         </body>
         </html>
         """
+
+
         self.web_view.SetPage(initial_html, "")
+        tmp_file=self.save_html(initial_html)
+        self.page_history.append(tmp_file)
 
 
     def _set_initial_content(self):
@@ -759,7 +944,7 @@ class Log_WebViewPanel(wx.Panel,AppLog_Controller):
 
 
 
-    def on_navigating(self, event):
+    def _on_navigating(self, event):
         url = event.GetURL()
         #print(f"Log Navigating to: {url[:50]}")
         if url.startswith("app:"):
@@ -799,7 +984,7 @@ class MyFrame(wx.Frame):
         # Split the main splitter window vertically between the left and right notebooks
         splitter.SplitVertically(left_notebook, right_notebook)
         splitter.SetSashGravity(0.5)  # Set initial split at 50% width for each side
-        splitter.SetMinimumPaneSize(500)  # Minimum pane width to prevent collapsing
+        splitter.SetMinimumPaneSize(400)  # Minimum pane width to prevent collapsing
 
         # Create button
         self.button = wx.Button(panel, label='Populate List')
