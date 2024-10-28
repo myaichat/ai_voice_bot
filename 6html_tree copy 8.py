@@ -39,10 +39,7 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         pub.subscribe(self.on_resize, "panel_resize")
     def on_resize(self, event): 
         #print('on_resize')
-        #self.adjust_size_to_fit_content(self.text_item)
-        max_width = self.GetParent().GetSize().width - 75 
-        x, y=self.GetSize()
-        self.SetSize((max_width, y))       
+        self.adjust_size_to_fit_content(self.text_item)       
     def on_mouse_wheel(self, event):
         # Do nothing to disable scroll
         #print('on_mouse_wheel')
@@ -451,39 +448,13 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
                 self.SetItemData(item, data)
             self.tid += 1
 
-            self.html_items[item_id]=html_list_box = CustomHtmlListBox(self.tid,self, text_item, self, item,  size=(300, 280))
+            self.html_items[item_id]=html_list_box = CustomHtmlListBox(self.tid,self, text_item, self, item,  size=(200, 180))
             #html_list_box.Enable(False)
             self.SetItemWindow(item, html_list_box)
-            html_list_box.SetMinSize((300, 280)) 
         
         # Add sample history items to the HtmlListBox
         #html_list_box.add_history_item("First line\nSecond line\nThird line")
         return item
-    def _AppendMultilineItem(self, item_id, parent, text_item, data=None):
-        # Append an item with an empty string as the text
-        if item_id not in self.html_items:
-            item = self.AppendItem(parent, "")
-            if data is not None:
-                self.SetItemData(item, data)
-            self.tid += 1
-
-            # Create the CustomHtmlListBox instance with the desired size
-            html_list_box = CustomHtmlListBox(self.tid, self, text_item, self, item, size=(300, 280))
-            self.html_items[item_id] = html_list_box
-
-            # Create a sizer and set the item height within the sizer
-            item_sizer = wx.BoxSizer(wx.VERTICAL)
-            item_sizer.Add(html_list_box, flag=wx.EXPAND | wx.ALL, proportion=1, border=0)
-            
-            # Apply the sizer to the tree control to handle resizing
-            item.SetSizer(item_sizer)
-            item.SetMinSize((300, 280))  # Explicitly set the height
-
-            # Set the item window and update the layout
-            self.SetItemWindow(item, html_list_box)
-            self.Layout()  # Force a layout update to apply the size changes
-
-            return item
 
     def OnSingleClick(self, event):
         if self.single_click_delayed:

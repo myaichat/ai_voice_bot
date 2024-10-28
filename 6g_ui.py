@@ -233,7 +233,7 @@ def _long_running_process():
             responses = client.streaming_recognize(streaming_config, requests)
 
             # Now, put the transcription responses to use.
-            listen_print_loop(responses, stream)
+            listen_print_loop(0,responses, stream)
 
             if stream.result_end_time > 0:
                 stream.final_request_end_time = stream.is_final_end_time
@@ -1284,11 +1284,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())  # Use asyncio.run() to start the main function   
-if 0 and __name__ == "__main__":
-    #app = MyApp()
-    app = MyApp()
-    #app.MainLoop()
-    asyncio.get_event_loop().run_until_complete(app.MainLoop())
+
 
 
 

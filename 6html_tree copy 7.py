@@ -39,10 +39,14 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         pub.subscribe(self.on_resize, "panel_resize")
     def on_resize(self, event): 
         #print('on_resize')
-        #self.adjust_size_to_fit_content(self.text_item)
-        max_width = self.GetParent().GetSize().width - 75 
-        x, y=self.GetSize()
-        self.SetSize((max_width, y))       
+        #self.adjust_size_to_fit_content(self.text_item)  
+        self.adjust_size_to_fit_content(self.text_item)
+        #formatted_text=self.adjust_size_to_fit_content(self.text_item)
+        #self.formatted_item=formatted_text        
+        if 0 and self.tree_item:
+            # Force layout update on the tree item holding this control
+            self.tree_ctrl.SetItemWindow(self.tree_item, self)  # Re-assign to trigger layout
+            self.tree_ctrl.Layout()  # Force layout update on the tree control             
     def on_mouse_wheel(self, event):
         # Do nothing to disable scroll
         #print('on_mouse_wheel')
@@ -54,72 +58,29 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         pass
 
     def add_history_item(self, item):
+        
         """Add a new history item with multiline text to the HtmlListBox."""
         #pp(item)
 
         #self.history_items.append(formatted_text)
         #self.SetItemCount(len(self.history_items))
-        formatted_text=self.adjust_size_to_fit_content(item)
-        self.formatted_item=formatted_text
+        if 1:
+            formatted_text=self.get_formatted_text(item)
+            self.formatted_item=formatted_text
+        else:
+            html_text = item.replace("\n", "<br>")
+            self.formatted_text = f"""<span style="color: #2d2d2d; font-size: 14px; font-family: Arial, sans-serif;"><b>>></b>{html_text}</span>"""
         self.SetItemCount(1)
         self.Refresh()
-
-    def adjust_size_to_fit_content(self, text_item):
+    def get_formatted_text(self, text_item):
         """Calculate and adjust the size of the list box based on the content and LeftPanel width, with scroll check."""
         # Get the width of the LeftPanel (parent's parent in this case)
-        max_width = self.GetParent().GetSize().width - 75  # Padding to prevent overflow
+
 
         # Use a device context to measure the text size
-        dc = wx.ClientDC(self)
-        dc.SetFont(self.GetFont())
+        
         text = text_item
-
-        # Measure each line of text and wrap if necessary
-        lines = text.split("\n")
-        wrapped_lines = []
-        total_height = 0
-
-        for line in lines:
-            line_width, line_height = dc.GetTextExtent(line)
-            if line_width > max_width:
-                # Wrap the line manually if it exceeds max width
-                wrapped_line = ""
-                for word in line.split(" "):
-                    test_line = f"{wrapped_line} {word}".strip()
-                    test_width, _ = dc.GetTextExtent(test_line)
-                    if test_width > max_width:
-                        wrapped_lines.append(wrapped_line)
-                        wrapped_line = word
-                        total_height += line_height
-                    else:
-                        wrapped_line = test_line
-                wrapped_lines.append(wrapped_line)
-                total_height += line_height
-            else:
-                wrapped_lines.append(line)
-                total_height += line_height
-
-        # Set the total width and height with padding
-        text_length = len(text)
-        dynamic_padding = 20 + int(text_length / 25)  # Adjust base padding for longer text
-
-        # Check the height-to-width ratio and adjust padding accordingly
-        if total_height > max_width:
-            # Increase padding further if the content height is greater than the available width
-            dynamic_padding += int(total_height / 20)  # Increase padding based on height
-
-        # Set the total width and height with dynamic padding
-        adjusted_height = total_height + dynamic_padding
-
-        # Check if the item would require scrolling by comparing the adjusted height to the current height
-        current_height = self.GetSize().height
-        if  0 and adjusted_height > current_height:
-            # If the adjusted height is greater, increase the height a bit more to avoid scrolling
-            adjusted_height += 20  # Additional height if scrolling is needed
-
-        # Set the size of the list box, limiting the width to max_width
-        self.SetSize((max_width, adjusted_height))
-
+       
         # Refresh with wrapped content if necessary
         html_text = text.replace("\n", "<br>")
         formatted_text = f"""<span style="color: #2d2d2d; font-size: 14px; font-family: Arial, sans-serif;"><b>>></b>{html_text}</span>"""        
@@ -130,6 +91,64 @@ class CustomHtmlListBox(wx.html.HtmlListBox):
         # Update the size of the HtmlListBox
         #self.SetSize((max_width, total_height))
         return formatted_text
+
+    def adjust_size_to_fit_content(self, text_item):
+        """Calculate and adjust the size of the list box based on the content and LeftPanel width, with scroll check."""
+        # Get the width of the LeftPanel (parent's parent in this case)
+        max_width = self.GetParent().GetSize().width - 75  # Padding to prevent overflow
+
+        # Use a device context to measure the text size
+        dc = wx.ClientDC(self)
+        dc.SetFont(self.GetFont())
+        text = text_item
+        if 1:
+            # Measure each line of text and wrap if necessary
+            lines = text.split("\n")
+            wrapped_lines = []
+            total_height = 0
+
+            for line in lines:
+                line_width, line_height = dc.GetTextExtent(line)
+                if line_width > max_width:
+                    # Wrap the line manually if it exceeds max width
+                    wrapped_line = ""
+                    for word in line.split(" "):
+                        test_line = f"{wrapped_line} {word}".strip()
+                        test_width, _ = dc.GetTextExtent(test_line)
+                        if test_width > max_width:
+                            wrapped_lines.append(wrapped_line)
+                            wrapped_line = word
+                            total_height += line_height
+                        else:
+                            wrapped_line = test_line
+                    wrapped_lines.append(wrapped_line)
+                    total_height += line_height
+                else:
+                    wrapped_lines.append(line)
+                    total_height += line_height
+
+            # Set the total width and height with padding
+            text_length = len(text)
+            dynamic_padding = 20 + int(text_length / 25)  # Adjust base padding for longer text
+
+            # Check the height-to-width ratio and adjust padding accordingly
+            if total_height > max_width:
+                # Increase padding further if the content height is greater than the available width
+                dynamic_padding += int(total_height / 20)  # Increase padding based on height
+
+            # Set the total width and height with dynamic padding
+            adjusted_height = total_height + dynamic_padding
+
+            # Check if the item would require scrolling by comparing the adjusted height to the current height
+            current_height = self.GetSize().height
+            if  0 and adjusted_height > current_height:
+                # If the adjusted height is greater, increase the height a bit more to avoid scrolling
+                adjusted_height += 20  # Additional height if scrolling is needed
+
+            # Set the size of the list box, limiting the width to max_width
+            self.SetSize((max_width, adjusted_height))
+
+
     def on_paint(self, event):
         """Handle paint event to draw scroll indicators if needed."""
         # First call the default paint method
@@ -284,6 +303,7 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
     async def update_tree_periodically(self):
         #queue=apc.trans_queue
         while True:
+            self.Freeze()
             if self.content_buffer:
                 #print(self.content_buffer[0])
                 #pub.sendMessage("display_response", response=self.content_buffer)
@@ -298,8 +318,10 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
                             self.on_partial_stream(data)
                 self.content_buffer = [] # Clear buffer after update
             await asyncio.sleep(0.2)  # Update every 200ms
+            self.Thaw()
 
-    def on_partial_stream(self, data):  
+    def on_partial_stream(self, data): 
+        
         transcript, corrected_time, tid, rid = data
         #print('on_partial_stream')
         #print(transcript, corrected_time, tid, rid)
@@ -341,8 +363,8 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
             self.html_items[item_id] = new_html_item  # Replace the old reference with the new one
             
             # Attach the new HtmlListBox to the tree item
-            self.SetItemWindow(tree_item, new_html_item)
-            if 0:
+            
+            if 1:
                 # Adjust layout to reflect the changes
                 new_html_item.adjust_size_to_fit_content(transcript)
                 self.Layout()
@@ -350,6 +372,7 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
                 # Optionally expand/collapse to force a refresh if needed
                 self.Collapse(tree_item)
                 self.Expand(tree_item)
+            self.SetItemWindow(tree_item, new_html_item)
 
     def _on_stream_closed(self, data):
         transcript, corrected_time, tid, rid = data
@@ -416,6 +439,7 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
         self.SetButtonsImageList(image_list)
 
     def UpdateMultilineItem(self, item_id, parent, text_item, data=None):
+        self.Freeze()
         assert item_id in self.html_items, f"Item ID {item_id} not found in html_items"
         
         # Access the HtmlListBox for the specific item
@@ -425,9 +449,26 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
         html_item.add_history_item(text_item)
         
         # Adjust the size to fit new content
-        html_item.adjust_size_to_fit_content(text_item)
-        html_item.Update()  # Refresh the HtmlListBox
-        if 1:
+        #html_item.adjust_size_to_fit_content(text_item)
+        #html_item.Update()  # Refresh the HtmlListBox
+        if 0:
+            tree_item = self.html_items[item_id].tree_item
+            old_html_item = self.html_items[item_id]
+            
+            # Remove the old control from the tree item
+            self.DeleteItemWindow(tree_item)
+            
+            # Explicitly delete the old HtmlListBox to free up resources
+            #old_html_item.Destroy()
+            
+            # Create a new HtmlListBox with the final transcription
+            new_html_item = CustomHtmlListBox(self.tid, self, text_item, self, tree_item, size=(200, 80))
+            self.html_items[item_id] = new_html_item  # Replace the old reference with the new one
+            
+            # Attach the new HtmlListBox to the tree item
+            self.SetItemWindow(tree_item, new_html_item)
+        
+        if 0:
             
             # Invalidate the best size and trigger layout recalculation for the tree control
             self.InvalidateBestSize()
@@ -439,7 +480,7 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
             
             # Expand all to ensure visibility for the updated item, if needed
             self.ExpandAll()              
-
+        self.Thaw()
     
     def AppendMultilineItem(self, item_id, parent, text_item, data=None):
         # Append an item with an empty string as the text
@@ -450,40 +491,15 @@ class MultiLineHtmlTreeCtrl(CT.CustomTreeCtrl):
             if data is not None:
                 self.SetItemData(item, data)
             self.tid += 1
-
-            self.html_items[item_id]=html_list_box = CustomHtmlListBox(self.tid,self, text_item, self, item,  size=(300, 280))
+            max_width = self.GetParent().GetSize().width - 75  # Padding to prevent overflow
+            self.html_items[item_id]=html_list_box = CustomHtmlListBox(self.tid,self, text_item, self, item,  size=(200, 180))
             #html_list_box.Enable(False)
             self.SetItemWindow(item, html_list_box)
-            html_list_box.SetMinSize((300, 280)) 
-        
-        # Add sample history items to the HtmlListBox
-        #html_list_box.add_history_item("First line\nSecond line\nThird line")
-        return item
-    def _AppendMultilineItem(self, item_id, parent, text_item, data=None):
-        # Append an item with an empty string as the text
-        if item_id not in self.html_items:
-            item = self.AppendItem(parent, "")
-            if data is not None:
-                self.SetItemData(item, data)
-            self.tid += 1
-
-            # Create the CustomHtmlListBox instance with the desired size
-            html_list_box = CustomHtmlListBox(self.tid, self, text_item, self, item, size=(300, 280))
-            self.html_items[item_id] = html_list_box
-
-            # Create a sizer and set the item height within the sizer
-            item_sizer = wx.BoxSizer(wx.VERTICAL)
-            item_sizer.Add(html_list_box, flag=wx.EXPAND | wx.ALL, proportion=1, border=0)
             
-            # Apply the sizer to the tree control to handle resizing
-            item.SetSizer(item_sizer)
-            item.SetMinSize((300, 280))  # Explicitly set the height
-
-            # Set the item window and update the layout
-            self.SetItemWindow(item, html_list_box)
-            self.Layout()  # Force a layout update to apply the size changes
-
+            # Add sample history items to the HtmlListBox
+            #html_list_box.add_history_item("First line\nSecond line\nThird line")
             return item
+        
 
     def OnSingleClick(self, event):
         if self.single_click_delayed:
