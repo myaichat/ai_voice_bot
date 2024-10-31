@@ -8,7 +8,7 @@ import time
 from pprint import pprint as pp 
 
 # Set the API key for AssemblyAI
-aai.settings.api_key = "6a5baf29628a4325947088a4fb6343ac"
+aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 # Audio capture settings
 sample_rate = 16000

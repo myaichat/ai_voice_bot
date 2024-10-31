@@ -1,7 +1,7 @@
 import assemblyai as aai
 import requests
 
-aai.settings.api_key = "6a5baf29628a4325947088a4fb6343ac"
+aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 # Upload the audio file to AssemblyAI
 def upload_audio(file_path):

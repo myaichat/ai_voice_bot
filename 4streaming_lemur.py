@@ -1,6 +1,6 @@
 import assemblyai as aai
 
-aai.settings.api_key = "6a5baf29628a4325947088a4fb6343ac"
+aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 def on_open(session_opened: aai.RealtimeSessionOpened):
   "This function is called when the connection has been established."

@@ -2,7 +2,7 @@ import requests
 import time
 import assemblyai as aai
 from pprint import pprint as pp
-aai.settings.api_key = "6a5baf29628a4325947088a4fb6343ac"
+aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
 
 # Function to check the transcription status
 def check_transcription_status(transcript_id):
