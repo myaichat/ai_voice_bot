@@ -90,3 +90,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## References
 https://github.com/run-llama/openai_realtime_client
+### Next
+https://github.com/myaichat/rms_transcriber
+
