@@ -144,7 +144,7 @@ def main():
     data_queue = Queue()
     # We use SpeechRecognizer to record our audio because it has a nice feature where it can detect when speech ends.
     recorder = sr.Recognizer()
-    recorder.energy_threshold = args.energy_threshold
+    recorder.energy_threshold = args.energy_threshold #400
     # Definitely do this, dynamic energy compensation lowers the energy threshold dramatically to a point where the SpeechRecognizer never stops recording.
     recorder.dynamic_energy_threshold = False
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
