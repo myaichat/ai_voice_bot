@@ -1,5 +1,5 @@
 #! python3.7
-
+#https://gist.github.com/Oceanswave/32da596e8bb10c928f6c69c889c3c130
 import argparse
 import io
 import os
@@ -17,11 +17,6 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
-import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-
-import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 def setup_whisper_model(model_id="openai/whisper-large-v3", cache_dir="cache"):
     # Set device and dtype
