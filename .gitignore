@@ -6,6 +6,7 @@ log/
 # C extensions
 *.so
 myenv/
+cache/
 # Distribution / packaging
 .Python
 build/
