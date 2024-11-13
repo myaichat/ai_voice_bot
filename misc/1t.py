@@ -1,114 +1,47 @@
 import asyncio
-import os
-from pynput import keyboard
-from openai_realtime_client_1 import RealtimeClient, InputHandler, AudioHandler
-from llama_index.core.tools import FunctionTool
+from typing import Any, Dict
 
-# Example tool
-def get_phone_number(name: str) -> str:
-    """Get my phone number."""
-    if name == "Jerry":
-        return "1234567890"
-    elif name == "Logan":
-        return "0987654321"
-    else:
-        return "Unknown"
+# Base class RealtimeClient
+class RealtimeClient:
+    def __init__(self, on_audio_transcript_delta=None):
+        """Initialize the client with optional callback."""
+        self.on_audio_transcript_delta = on_audio_transcript_delta
 
-tools = [FunctionTool.from_defaults(fn=get_phone_number)]
+    async def simulate_audio_transcript_delta(self):
+        """Simulate the response from the WebSocket with an audio transcript delta."""
+        await asyncio.sleep(0.5)
+        event = {
+            "type": "response.audio_transcript.delta",
+            "delta": "This is the transcript of your voice message!"
+        }
+        
+        # Trigger the on_audio_transcript_delta callback if defined
+        if self.on_audio_transcript_delta:
+            self.on_audio_transcript_delta(event)
 
-async def main():
-    audio_handler = AudioHandler()
-    input_handler = InputHandler()
-    input_handler.loop = asyncio.get_running_loop()
+    def on_audio_transcript_delta(self, event):
+        """Default method in RealtimeClient to handle transcript delta events."""
+        print(f"[{self.__class__.__name__}] Received transcript: {event['delta']}")
 
-    client = RealtimeClient(
-        api_key=os.environ.get("OPENAI_API_KEY"),
-        on_text_delta=lambda text: print(f"\nAssistant: {text}", end="", flush=True),
-        on_audio_delta=lambda audio: audio_handler.play_audio(audio),
-        tools=tools,
-    )
+# Derived class MockRealtimeClient inheriting RealtimeClient
+class MockRealtimeClient(RealtimeClient):
+    async def handle_event(self, event_type):
+        """Handle events such as speech_started and speech_stopped."""
+        if event_type == "input_audio_buffer.speech_started":
+            print("[Mock Client] Handling speech started event.")
 
-    listener = keyboard.Listener(on_press=input_handler.on_press)
-    listener.start()
+        elif event_type == "input_audio_buffer.speech_stopped":
+            print("[Mock Client] Handling speech stopped event.")
+            # Simulate receiving audio transcript delta after speech stops
+            await self.simulate_audio_transcript_delta()
 
-    recording = False  # Track the recording state
-    processing_command = False  # Track if there is an active command
+# Test case to demonstrate functionality
+async def run_test():
+    # Initialize the mocked client
+    client = MockRealtimeClient()
 
-    async def handle_audio_commands():
-        nonlocal recording, processing_command
-        while True:
-            if processing_command:
-                await asyncio.sleep(0.1)  # Wait for other commands to finish
-                continue
+    # Simulate handling the input_audio_buffer.speech_stopped event
+    await client.handle_event("input_audio_buffer.speech_stopped")
 
-            command, _ = await input_handler.command_queue.get()
-
-            if command == 'r' and not recording:
-                print("[Starting recording...]")
-                recording = True
-                audio_handler.start_recording()
-
-            elif command == 'space' and recording:
-                print("[Stopping recording...]")
-                audio_data = audio_handler.stop_recording()
-                recording = False
-
-                if audio_data:
-                    print("[Sending audio...]")
-                    processing_command = True
-                    try:
-                        await client.send_audio(audio_data)
-                        print("[Audio sent]")
-                    except Exception as e:
-                        print(f"Error sending audio: {e}")
-                    processing_command = False
-                else:
-                    print("Error: No audio data captured.")
-
-            await asyncio.sleep(0.01)
-
-    async def handle_text_commands():
-        nonlocal processing_command
-        while True:
-            if processing_command:
-                await asyncio.sleep(0.1)  # Wait for other commands to finish
-                continue
-
-            command, data = await input_handler.command_queue.get()
-
-            if command == 'enter' and data:
-                processing_command = True
-                try:
-                    await client.send_text(data)
-                    print("[Text sent]")
-                except Exception as e:
-                    print(f"Error sending text: {e}")
-                processing_command = False
-
-            elif command == 'q':
-                return
-
-            await asyncio.sleep(0.01)
-
-    try:
-        await client.connect()
-        print("Connected to OpenAI Realtime API!")
-        print("Commands: \n- Press 'r' to record, 'space' to stop recording, 'enter' to send text, 'q' to quit.")
-
-        # Run tasks concurrently
-        await asyncio.gather(
-            client.handle_messages(),
-            handle_audio_commands(),
-            #handle_text_commands(),
-        )
-
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        listener.stop()
-        audio_handler.cleanup()
-        await client.close()
-
-if __name__ == "__main__":
-    print("Starting Realtime API CLI...")
-    asyncio.run(main())
+# Run the test using asyncio
+asyncio.run(run_test())
